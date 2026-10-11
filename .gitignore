@@ -1,0 +1,23 @@
+# Android / Gradle
+*.iml
+.gradle/
+.kotlin/
+.idea/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+*.jks
+*.keystore
+*.p12
+*.apk
+*.aab
+*.log
+*.hprof
+
+# macOS
+.DS_Store
+
+# 杂项（PowerShell 重定向残留等）
+/$null

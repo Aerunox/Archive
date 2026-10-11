@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="offline_action_queued">Offline: the action was saved and will sync automatically.</string>
+    <!-- Update check (UpdateChecker) -->
+    <string name="update_available_title">New version available</string>
+    <string name="update_current_version">Current: %1$s</string>
+    <string name="update_latest_version">Latest: %1$s</string>
+    <string name="update_go_download">Go to Download</string>
+    <string name="update_later">Later</string>
+    <string name="update_ignore_version">Skip this version</string>
+    <string name="update_version_ignored">Version skipped. You will be prompted again when a newer version is released</string>
+
+    <!-- Download notification (DownloadWorker) -->
+    <string name="download_channel_name">Download progress</string>
+    <string name="download_channel_desc">Shows download progress in the notification bar</string>
+    <string name="download_notification_title_image">Downloading image</string>
+    <string name="download_notification_title_video">Downloading video</string>
+    <string name="download_notification_title_attachment">Downloading attachment</string>
+    <string name="download_notification_progress">%1$s · %2$d%%</string>
+    <string name="download_notification_failed">Download failed: %1$s</string>
+    <string name="download_notification_complete_image">Image saved to gallery</string>
+    <string name="download_notification_complete_video">Video saved to gallery</string>
+    <string name="download_notification_complete_attachment">Attachment saved to Downloads</string>
+
+    <!-- Download progress notification (DownloadNotificationController): per-task notification + pause/resume/cancel -->
+    <string name="notif_action_pause">Pause</string>
+    <string name="notif_action_resume">Resume</string>
+    <string name="notif_action_cancel">Cancel</string>
+    <string name="notif_downloading_summary">Downloading %1$d files</string>
+    <string name="notif_progress_detail">%1$s of %2$s · %3$s · %4$s left</string>
+    <string name="notif_speed">%1$s/s</string>
+    <string name="notif_paused_detail">Paused · %1$d%%</string>
+    <string name="notif_completed_detail">Download completed · %1$s</string>
+    <string name="notif_error_unknown">Unknown error</string>
+    <string name="notif_eta_unknown">calculating</string>
+
+    <!-- Content update notification (ContentUpdateNotifier) -->
+    <string name="content_update_channel_name">Content updates</string>
+    <string name="content_update_channel_desc">Notifications for new posts from subscribed creators</string>
+    <string name="content_update_notification_title">New content update</string>
+    <string name="content_update_notification_multi">%1$d new content updates</string>
+
+    <!-- Registration/auth (AuthRepository) -->
+    <string name="register_failed">Registration failed: HTTP %1$d</string>
+    <string name="register_failed_validation">Invalid registration details, please check username and password</string>
+    <string name="register_failed_unknown">Registration failed, please try again later</string>
+    <string name="error_passwords_not_match">Passwords do not match</string>
+    <string name="register_username_rule">Username must be 3-15 characters: lowercase letters, digits, or _ @ + . - (site rule)</string>
+    <string name="register_failed_captcha">Registration on the site requires a captcha, which this client cannot pass. Please register in a browser at pawchive.pw, or log in to an existing account.</string>
+</resources>
