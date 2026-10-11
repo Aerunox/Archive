@@ -1,0 +1,204 @@
+package com.archive.core.api
+
+import com.archive.core.model.Announcement
+import com.archive.core.model.Comment
+import com.archive.core.model.Creator
+import com.archive.core.model.CreatorProfile
+import com.archive.core.model.CreatorTag
+import com.archive.core.model.FanCard
+import com.archive.core.model.FavoriteCreator
+import com.archive.core.model.FavoritePost
+import com.archive.core.model.FileSearchResult
+import com.archive.core.model.Post
+import com.archive.core.model.PostRevision
+import com.archive.core.model.User
+import okhttp3.ResponseBody
+import retrofit2.Response
+import retrofit2.http.DELETE
+import retrofit2.http.Field
+import retrofit2.http.FormUrlEncoded
+import retrofit2.http.GET
+import retrofit2.http.Header
+import retrofit2.http.POST
+import retrofit2.http.Path
+import retrofit2.http.Query
+
+interface PawchiveApi {
+
+    // ============ 公开 API (v1) ============
+
+    @GET("creators")
+    suspend fun getCreators(): List<Creator>
+
+    @GET("posts")
+    suspend fun getRecentPosts(
+        @Query("q") query: String? = null,
+        @Query("o") offset: Int? = null,
+        @Header("Cache-Control") cacheControl: String? = null
+    ): List<Post>
+
+    @GET("{service}/user/{creator_id}/profile")
+    suspend fun getCreatorProfile(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String
+    ): CreatorProfile
+
+    @GET("{service}/user/{creator_id}")
+    suspend fun getCreatorPosts(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String,
+        @Query("q") query: String? = null,
+        @Query("tag") tag: String? = null,
+        @Query("o") offset: Int? = null
+    ): List<Post>
+
+    @GET("{service}/user/{creator_id}/tags")
+    suspend fun getCreatorTags(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String
+    ): List<CreatorTag>
+
+    @GET("{service}/user/{creator_id}/post/{post_id}")
+    suspend fun getPostDetails(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String,
+        @Path("post_id") postId: String
+    ): Post
+
+    @GET("{service}/user/{creator_id}/post/{post_id}/comments")
+    suspend fun getPostComments(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String,
+        @Path("post_id") postId: String
+    ): List<Comment>
+
+    @GET("{service}/user/{creator_id}/post/{post_id}/revisions")
+    suspend fun getPostRevisions(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String,
+        @Path("post_id") postId: String
+    ): List<PostRevision>
+
+    @GET("{service}/user/{creator_id}/announcements")
+    suspend fun getCreatorAnnouncements(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String
+    ): List<Announcement>
+
+    @GET("{service}/user/{creator_id}/fancards")
+    suspend fun getCreatorFancards(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String
+    ): List<FanCard>
+
+    @GET("{service}/user/{creator_id}/links")
+    suspend fun getCreatorLinks(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String
+    ): List<CreatorProfile>
+
+    @POST("{service}/user/{creator_id}/post/{post}/flag")
+    suspend fun flagPost(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String,
+        @Path("post") post: String
+    ): Unit
+
+    @GET("{service}/user/{creator_id}/post/{post}/flag")
+    suspend fun isPostFlagged(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String,
+        @Path("post") post: String
+    ): Unit
+
+    @GET("search_hash/{file_hash}")
+    suspend fun searchByHash(
+        @Path("file_hash") fileHash: String
+    ): FileSearchResult
+
+    // ============ 认证和收藏相关接口 (需要登录) ============
+
+    /**
+     * 获取收藏的帖子列表
+     *
+     * [cacheControl] 传 "no-cache" 可跳过 ApiMemoryCache 的 5 分钟内存缓存；
+     * 返回本页时的静默同步与下拉刷新都必须传，否则会读到陈旧列表。
+     */
+    @GET("account/favorites")
+    suspend fun getFavoritePosts(
+        @Query("type") type: String = "post",
+        @Query("o") offset: Int? = null,
+        @Header("Cache-Control") cacheControl: String? = null
+    ): List<FavoritePost>
+
+    /**
+     * 获取收藏的创作者列表
+     *
+     * [cacheControl] 语义同 [getFavoritePosts]。
+     */
+    @GET("account/favorites")
+    suspend fun getFavoriteCreators(
+        @Query("type") type: String = "artist",
+        @Header("Cache-Control") cacheControl: String? = null
+    ): List<FavoriteCreator>
+
+    /**
+     * 添加帖子到收藏
+     */
+    @POST("favorites/post/{service}/{creator_id}/{post_id}")
+    suspend fun addPostToFavorites(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String,
+        @Path("post_id") postId: String
+    ): Response<Void>
+
+    /**
+     * 从收藏移除帖子
+     */
+    @DELETE("favorites/post/{service}/{creator_id}/{post_id}")
+    suspend fun removePostFromFavorites(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String,
+        @Path("post_id") postId: String
+    ): Response<Void>
+
+    /**
+     * 添加创作者到收藏
+     */
+    @POST("favorites/creator/{service}/{creator_id}")
+    suspend fun addCreatorToFavorites(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String
+    ): Response<Void>
+
+    /**
+     * 从收藏移除创作者
+     */
+    @DELETE("favorites/creator/{service}/{creator_id}")
+    suspend fun removeCreatorFromFavorites(
+        @Path("service") service: String,
+        @Path("creator_id") creatorId: String
+    ): Response<Void>
+}
+
+/**
+ * 登录 API 接口 - 使用不同的 base URL (网页端点)
+ */
+interface PawchiveLoginApi {
+    @FormUrlEncoded
+    @POST("account/login")
+    suspend fun login(
+        @Field("username") username: String,
+        @Field("password") password: String,
+        @Field("location") location: String = ""
+    ): Response<Void>
+
+    @FormUrlEncoded
+    @POST("account/register")
+    suspend fun register(
+        @Field("username") username: String,
+        @Field("password") password: String,
+        @Field("confirm_password") confirmPassword: String,
+        @Field("location") location: String = ""
+    ): Response<ResponseBody>
+}
