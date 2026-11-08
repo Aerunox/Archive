@@ -137,6 +137,7 @@
     <string name="history_local_only">この端末にのみ保存されます</string>
     <string name="pull_to_refresh_pull">引っ張って更新</string>
     <string name="pull_to_refresh_release">離して更新</string>
+    <string name="pull_to_refresh_refreshing">更新中…</string>
     <string name="pull_to_refresh_done">更新しました</string>
     <string name="register_web_hint">登録には captcha が必要なため、下に公式の登録ページを埋め込んでいます。ページで登録またはログインすると自動でログインします。うまくいかない場合は「ログイン」タブをご利用ください。</string>
     <string name="register_web_open_browser">ブラウザで開く</string>

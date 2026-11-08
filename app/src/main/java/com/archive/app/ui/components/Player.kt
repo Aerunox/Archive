@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -67,6 +66,7 @@ import coil3.request.transformations
 import coil3.video.videoFramePercent
 import com.archive.core.api.ApiClient
 import com.archive.app.ui.LocalSettingsManager
+import com.archive.app.ui.design.AppSpinner
 import com.archive.app.ui.design.AppText
 import com.archive.app.ui.design.AppTextStyle
 import com.archive.app.ui.design.lucide.LucideIcons
@@ -386,11 +386,7 @@ internal fun ViewerVideoPane(
                         modifier = Modifier.fillMaxSize(),
                     )
                     if (buffering) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(36.dp),
-                            color = Color.White,
-                            strokeWidth = 3.dp,
-                        )
+                        AppSpinner(size = 36.dp, strokeWidth = 3.dp, color = Color.White)
                     }
                 }
 
@@ -626,7 +622,7 @@ fun AudioPlayer(
             contentAlignment = Alignment.Center,
         ) {
             if (buffering) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                AppSpinner(size = 20.dp, color = Color.White)
             } else {
                 Icon(
                     imageVector = if (isPlaying) LucideIcons.pause else LucideIcons.play,

@@ -229,8 +229,10 @@ class CreatorDetailViewModel @Inject constructor(
     /** 云端收藏序号索引（「按收藏时间排序」用）。 */
     private val favedIndex: StateFlow<FavedSeqIndex> = favoriteSeqRepository.index
 
-    /** 已加载的帖子（按加载次序追加，切标签/换关键词时清空）——排序的数据源。 */
-    private val loadedPosts = mutableListOf<PostSummary>()
+    /** 已加载的帖子（按加载次序追加，切标签/换关键词时清空）——排序的数据源。
+     *  flatMapLatest 重建 Pager 后旧加载协程仍可能写同一列表，而 combine 在主线程排序遍历；
+     *  普通 MutableList 会 CME / 两批数据混合错乱，用 COW 列表保证读写一致。 */
+    private val loadedPosts = java.util.concurrent.CopyOnWriteArrayList<PostSummary>()
     private val loadedTick = MutableStateFlow(0)
 
     /**
@@ -773,11 +775,12 @@ private fun FancardsPane(
             } else {
                 "/$h$ext"
             }
-            // 粉丝卡图源三级回退（抄自 Pawchive CreatorProfileFragment）
+            // 粉丝卡图源三级回退（抄自 Pawchive CreatorProfileFragment）；
+            // 域名必须从 baseUrl 派生（UrlProvider），否则自定义 Base URL 时图片仍打旧域。
             val urls = listOf(
-                "https://img.pawchive.pw/data$path",
-                "https://file.pawchive.pw/data$path",
-                "https://img.pawchive.pw/thumbnail/data$path",
+                com.archive.app.data.remote.UrlProvider.imgBase(baseUrl).trimEnd('/') + "/data$path",
+                com.archive.app.data.remote.UrlProvider.fileBase(baseUrl).trimEnd('/') + "/data$path",
+                com.archive.app.data.remote.UrlProvider.imgBase(baseUrl).trimEnd('/') + "/thumbnail/data$path",
             )
             MultiFallbackImage(
                 urls = urls,
@@ -814,6 +817,9 @@ private fun SimilarPane(
                 baseUrl = baseUrl,
                 favorited = row.favorited,
                 updatedText = row.updatedText,
+                // 行点击是跳转到该作者，行尾用「查看」文字按钮提示语义，
+                // 不用展开箭头（那是发现页原地展开的样式）
+                trailingLabel = "查看",
                 onClick = { navController.navigate(Routes.creator(row.service, row.id)) },
             )
         }

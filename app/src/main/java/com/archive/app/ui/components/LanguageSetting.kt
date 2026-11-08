@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import com.archive.app.R
 import com.archive.app.data.AppLanguage
 import com.archive.app.data.TranslationSettingsRepository
+import com.archive.app.data.readLanguageMirror
 import com.archive.app.data.writeLanguageMirror
 import com.archive.app.ui.design.AppDropdownSetting
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,15 +32,24 @@ class LanguageViewModel @Inject constructor(
 
     val language = repository.settings
         .map { AppLanguage.fromName(it.language) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, AppLanguage.SYSTEM)
+        // 初值取同步镜像而非硬编码 SYSTEM：镜像一定是最新值，避免 recreate 后
+        // DataStore flow 首帧未达时，下拉先闪一下「跟随系统」再跳回真值。
+        .stateIn(viewModelScope, SharingStarted.Eagerly, context.readLanguageMirror())
 
     /**
-     * 切换语言：**先同步写镜像**（`Activity.attachBaseContext` 依赖它同步读取），再持久化。
-     * 镜像写入是同步的，所以调用方紧接着 `recreate()` 不会出现「用旧语言重建」的竞态。
+     * 切换语言：**先同步写镜像**（`Activity.attachBaseContext` 依赖它同步读取），
+     * 再把 DataStore 落盘**写完**才回调 `onApplied` 去 recreate。
+     *
+     * 为什么必须等写完再 recreate：本协程跑在 viewModelScope 里，recreate 会销毁
+     * Activity 并取消 scope —— 若在落盘前就 recreate，写入会被中断，杀掉应用重启后
+     * 选择的语言丢失（验收项「重启后仍保持」）。写完再重建即无此竞态。
      */
-    fun setLanguage(value: AppLanguage) {
+    fun setLanguage(value: AppLanguage, onApplied: () -> Unit) {
         context.writeLanguageMirror(value)
-        viewModelScope.launch { repository.setLanguage(value) }
+        viewModelScope.launch {
+            repository.setLanguage(value)
+            onApplied()
+        }
     }
 }
 
@@ -71,8 +81,10 @@ fun LanguageSettingCard() {
         onSelect = { index ->
             AppLanguage.entries.getOrNull(index)?.let { picked ->
                 if (picked != language) {
-                    viewModel.setLanguage(picked)
-                    (context as? android.app.Activity)?.recreate()
+                    // 落盘完成后才重建：避免 recreate 取消 scope 打断写入（见 ViewModel 注释）
+                    viewModel.setLanguage(picked) {
+                        (context as? android.app.Activity)?.recreate()
+                    }
                 }
             }
         },

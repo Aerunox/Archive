@@ -152,7 +152,14 @@ object ApiMemoryCache {
     fun invalidateByPathPrefix(pathPrefix: String): Int {
         return synchronized(cacheLock) {
             val matched = cache.keys.filter { key ->
-                key.substringAfter('|', missingDelimiterValue = "").contains(pathPrefix)
+                val url = key.substringAfter('|', missingDelimiterValue = "")
+                val path = url.substringBefore('?')
+                // 段边界前缀匹配：前缀后必须紧跟 '/' 或 '?'（或完全相等）。
+                // 用 contains 会让 "/posts" 误命中 "/cross_posts"、"/reposts?x=/posts"，
+                // 把无关接口的缓存整批清空。
+                path == pathPrefix ||
+                    (path.startsWith(pathPrefix) &&
+                        path.getOrNull(pathPrefix.length)?.let { it == '/' || it == '?' } == true)
             }
             matched.forEach { cache.remove(it) }
             matched.size

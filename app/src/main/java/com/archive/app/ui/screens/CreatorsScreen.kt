@@ -60,7 +60,6 @@ import com.archive.app.ui.design.appListModifier
 import com.archive.app.ui.design.hideBottomBarOnScroll
 import com.archive.app.ui.design.lucide.LucideIcons
 import com.archive.app.ui.design.rememberAppBottomBarScrollState
-import com.archive.app.ui.design.rememberAppScrollBehavior
 import com.archive.app.ui.navigation.Routes
 import com.archive.app.util.Fmt
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -178,9 +177,19 @@ class CreatorsViewModel @Inject constructor(
         syncing = true
         viewModelScope.launch {
             refreshing.value = true
+            // 这个接口一次返回约 15MB、9 万多行全量数据，实测同一网络下 11s~109s 都出现过。
+            // 进行中不加文字提示：由 AppPullToRefresh 的下拉加载动画承载（与首页一致），
+            // 以免既转圈又叠一行"正在同步…"文字。
             runCatching { creatorRepository.refresh() }
-                .onSuccess { message.value = "已同步 $it 位作者" }
-                .onFailure { message.value = "同步失败：${it.message ?: "网络错误"}" }
+                .onSuccess {
+                    // 0 行时本地库不会被清空（见 replaceAllInChunks 的空列表保护），文案要如实说明
+                    message.value = if (it > 0) {
+                        "已同步 $it 位作者"
+                    } else {
+                        "服务端返回 0 位作者，本地数据保持不变"
+                    }
+                }
+                .onFailure { message.value = "同步失败：${it.message ?: "网络错误"}（可下拉重试）" }
             refreshing.value = false
             syncing = false
         }
@@ -202,7 +211,6 @@ fun CreatorsScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val settings = LocalAppSettings.current
     val items = viewModel.creators.collectAsLazyPagingItems()
-    val scrollBehavior = rememberAppScrollBehavior()
 
     // 每次进入自动刷新：本地作者库为空时自动同步（否则仅用本地数据，避免每次进页下载全量）
     EnterRefreshEffect { viewModel.onEnter() }
@@ -211,14 +219,22 @@ fun CreatorsScreen(
     val scrollToTop = rememberListScrollToTopState(listState, onReachTop = { bottomBarState?.show() })
 
     AppScaffold(
-        topScrollBehavior = scrollBehavior,
+        // 不接可折叠大标题：折叠栏会让顶栏高度随滚动变化、contentPadding 跟着变，
+        // 列表反复重新测量；下拉刷新后数据整体重建时这一步会叠加成明显卡顿。
         topBar = { AppTopBar(title = "发现") },
     ) { padding ->
-        AppPullToRefresh(isRefreshing = refreshing, onRefresh = { viewModel.refresh() }) {
+        // 本页的下拉容器全屏铺底（顶栏盖在内容上面）：scaffold 的 top padding 通过
+        // 内置组件的 contentPadding 传给刷新指示器本身，让它露在顶栏下方；
+        // 内部列表的让位仍由下面 Column 自己的 padding 负责。
+        AppPullToRefresh(
+            isRefreshing = refreshing,
+            onRefresh = { viewModel.refresh() },
+            contentPadding = PaddingValues(top = padding.calculateTopPadding()),
+        ) {
             Box(Modifier.fillMaxSize()) {
                 if (items.loadState.refresh is LoadState.Error && items.itemCount == 0) {
                     AppErrorState(
-                        "本地作者库为空且加载失败，请点右上角同步",
+                        "本地作者库为空且同步失败，请重试或下拉刷新",
                         onRetry = { viewModel.refresh() },
                         modifier = Modifier
                             .fillMaxSize()
@@ -284,7 +300,7 @@ fun CreatorsScreen(
                             ),
                         ) {
                             if (items.itemCount == 0 && items.loadState.refresh is LoadState.NotLoading) {
-                                item { AppEmptyState("本地还没有作者数据，下拉或点右上角同步") }
+                                item { AppEmptyState("本地还没有作者数据，下拉即可同步") }
                             }
                             items(
                                 count = items.itemCount,

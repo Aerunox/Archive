@@ -398,6 +398,15 @@ class AuthRepository @Inject constructor(
     ): Result<Unit> {
         val result = call()
         if (result.isSuccess) return result
+        // 只把"网络不可用导致的失败"交给离线队列；认证错误（未登录/会话失效）、
+        // 服务端 4xx、Cloudflare 挑战等即使当前无网也补写不成功——塞进队列只会
+        // 回报假成功，用户以为收藏完成，实际服务器从未收到。
+        val error = result.exceptionOrNull()
+        if (error is AppError.Auth ||
+            error is AppError.Server ||
+            error is AppError.Business ||
+            error is AppError.CloudflareChallenge
+        ) return result
         if (NetworkUtils.isNetworkAvailable(context)) return result
         pendingFavoriteActionRepository.enqueue(kind, service, creatorId, postId)
         return Result.success(Unit)

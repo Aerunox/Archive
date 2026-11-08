@@ -80,6 +80,47 @@ class SettingsManager @Inject constructor(@ApplicationContext context: Context) 
     }
 
     /**
+     * 自动清理临时缓存的频率（FEATURE：设置页自动清理）。
+     * 仅在「自动清理」总开关开启时生效；默认关闭，因此频率默认值不改变任何现有行为。
+     *
+     * - [EVERY_LAUNCH]：每次应用启动后台清理一次（不走周期任务，由 Application 侧排一次性的活）；
+     * - 其余按 [periodicHours] 交给 WorkManager 周期任务。周期任务系统下限 15 分钟，
+     *   这里最短档「每天」远大于下限，无需担心。
+     */
+    enum class CacheCleanFrequency(val key: String, val periodicHours: Long?) {
+        EVERY_LAUNCH("every_launch", null),
+        DAILY("daily", 24),
+        WEEKLY("weekly", 24 * 7),
+        MONTHLY("monthly", 24 * 30);
+
+        companion object {
+            fun fromKey(key: String?): CacheCleanFrequency =
+                entries.find { it.key == key } ?: DAILY
+        }
+    }
+
+    /**
+     * 缓存容量上限（设置项：存储与清理）。
+     *
+     * 只作为「缓存目录允许占用的最大体积」这一档位开关使用：超出后由自动清理任务
+     * 按此上限回收临时缓存，不涉及已下载的文件。默认 [UNLIMITED]——首次安装不做限制。
+     */
+    enum class CacheSizeLimit(val key: String, val bytes: Long?) {
+        MB100("100mb", 100L * 1024 * 1024),
+        MB500("500mb", 500L * 1024 * 1024),
+        GB1("1gb", 1024L * 1024 * 1024),
+        UNLIMITED("unlimited", null);
+
+        companion object {
+            fun fromKey(key: String?): CacheSizeLimit =
+                entries.find { it.key == key } ?: UNLIMITED
+
+            /** 滑块档位顺序（100MB / 500MB / 1GB / 无限制）。 */
+            val SLIDER_ORDER = entries
+        }
+    }
+
+    /**
      * 启动主界面 Tab（FEATURE：启动页可配置）。
      * 用户进入 App 后默认停留的主 Tab，可在设置页修改。
      */
@@ -291,6 +332,29 @@ class SettingsManager @Inject constructor(@ApplicationContext context: Context) 
 
     fun setAutoCleanCacheEnabled(enabled: Boolean) {
         write { it[KEY_AUTO_CLEAN_CACHE] = enabled }
+    }
+
+    /**
+     * 自动清理临时缓存的频率（仅在 [isAutoCleanCacheEnabled] 为真时生效）。
+     * 默认 [CacheCleanFrequency.DAILY]，但总开关默认关闭，所以默认状态下不会自动清理。
+     */
+    fun getCacheCleanFrequency(): CacheCleanFrequency {
+        return CacheCleanFrequency.fromKey(read { it[KEY_CACHE_CLEAN_FREQUENCY] })
+    }
+
+    fun setCacheCleanFrequency(frequency: CacheCleanFrequency) {
+        write { it[KEY_CACHE_CLEAN_FREQUENCY] = frequency.key }
+    }
+
+    /**
+     * 缓存容量上限。默认 [CacheSizeLimit.UNLIMITED]，即首次安装不限制缓存体积。
+     */
+    fun getCacheSizeLimit(): CacheSizeLimit {
+        return CacheSizeLimit.fromKey(read { it[KEY_CACHE_SIZE_LIMIT] })
+    }
+
+    fun setCacheSizeLimit(limit: CacheSizeLimit) {
+        write { it[KEY_CACHE_SIZE_LIMIT] = limit.key }
     }
 
     fun isAutoCheckUpdateEnabled(): Boolean {
@@ -767,6 +831,8 @@ class SettingsManager @Inject constructor(@ApplicationContext context: Context) 
         private val KEY_DOWNLOAD_TREE_URI = stringPreferencesKey("download_tree_uri")
         private val KEY_DOWNLOAD_LOCATION_NAME = stringPreferencesKey("download_location_name")
         private val KEY_AUTO_CLEAN_CACHE = booleanPreferencesKey("auto_clean_cache")
+        private val KEY_CACHE_CLEAN_FREQUENCY = stringPreferencesKey("cache_clean_frequency")
+        private val KEY_CACHE_SIZE_LIMIT = stringPreferencesKey("cache_size_limit")
         private val KEY_AUTO_CHECK_UPDATE = booleanPreferencesKey("auto_check_update")
         private val KEY_HIDE_BOOKMARKED_CREATORS = booleanPreferencesKey("hide_bookmarked_creators")
         private val KEY_DEDUPE_BY_CREATOR = booleanPreferencesKey("dedupe_by_creator")

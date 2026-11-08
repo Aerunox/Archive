@@ -137,6 +137,7 @@
     <string name="history_local_only">Hanya tersimpan di perangkat ini</string>
     <string name="pull_to_refresh_pull">Tarik untuk menyegarkan</string>
     <string name="pull_to_refresh_release">Lepaskan untuk menyegarkan</string>
+    <string name="pull_to_refresh_refreshing">Menyegarkan…</string>
     <string name="pull_to_refresh_done">Berhasil disegarkan</string>
     <string name="register_web_hint">Pendaftaran memerlukan captcha, jadi halaman resmi disematkan di bawah. Daftar atau masuk di sana dan aplikasi akan masuk otomatis; jika tidak, gunakan tab Masuk.</string>
     <string name="register_web_open_browser">Buka di browser</string>

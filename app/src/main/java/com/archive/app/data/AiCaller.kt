@@ -68,6 +68,11 @@ suspend fun callAi(
                         raw.take(200),
                 )
             }
-            return@withContext effective.apiType.parseReply(aiJson.parseToJsonElement(raw).jsonObject)
+            // 200 + 非 JSON（反代错误页、Cloudflare 挑战页）也要给出可读报错，
+            // 不能让 kotlinx 的裸 IllegalArgumentException 直接透给用户
+            val element = runCatching { aiJson.parseToJsonElement(raw) }.getOrElse {
+                error("响应不是 JSON · ${effective.apiType.label} · $model：" + raw.take(200))
+            }
+            return@withContext effective.apiType.parseReply(element.jsonObject)
         }
 }

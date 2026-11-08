@@ -79,12 +79,14 @@ class DownloadNotificationController @Inject constructor(
     fun taskStarted(record: DownloadRecord) {
         val count = activeCount.incrementAndGet()
         ensureForegroundService()
-        if (!notificationsEnabled()) return
-        ensureChannel()
+        // 无论通知是否可用都要登记任务状态：taskEnded 以 notificationIds 里有无该 id
+        // 判断是否递减计数，若通知被禁用就提前 return，计数只增不减，前台服务永不停止。
         val notifId = notifIdFor(record.id)
         notificationIds[record.id] = notifId
         speedTrackers[record.id] = SpeedTracker()
         lastNotifiedAt.remove(record.id)
+        if (!notificationsEnabled()) return
+        ensureChannel()
         notify(notifId, buildRunningNotification(record.id, record.fileName, 0, 0L, 0L, indeterminate = true))
         updateSummary(count)
     }

@@ -11,6 +11,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
 
 /** Thin wrappers screens actually call; dispatch to the active [DesignComponents]. */
 
@@ -183,8 +184,9 @@ fun AppPullToRefresh(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable () -> Unit,
-) = LocalDesign.current.PullToRefresh(isRefreshing, onRefresh, modifier, content)
+) = LocalDesign.current.PullToRefresh(isRefreshing, onRefresh, modifier, contentPadding, content)
 
 @Composable
 fun AppFab(

@@ -137,6 +137,7 @@
     <string name="history_local_only">Хранится только на этом устройстве</string>
     <string name="pull_to_refresh_pull">Потяните, чтобы обновить</string>
     <string name="pull_to_refresh_release">Отпустите, чтобы обновить</string>
+    <string name="pull_to_refresh_refreshing">Обновление…</string>
     <string name="pull_to_refresh_done">Обновлено</string>
     <string name="register_web_hint">Регистрация требует капчи, поэтому официальная страница встроена ниже. Зарегистрируйтесь или войдите там — приложение войдёт автоматически; иначе используйте вкладку «Вход».</string>
     <string name="register_web_open_browser">Открыть в браузере</string>

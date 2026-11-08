@@ -112,6 +112,8 @@ class ContentUpdateNotifier @Inject constructor(
         private const val TAG = "ContentUpdateNotifier"
 
         const val CHANNEL_ID = "pawchive_content_update"
-        private const val NOTIFICATION_ID = 2001
+        // 2001 被 DownloadNotificationController.SUMMARY_NOTIFICATION_ID（下载前台服务
+        // 常驻通知）占用：同 ID 通知会互相替换，把前台服务的通知顶掉。改用 2002 避让。
+        private const val NOTIFICATION_ID = 2002
     }
 }

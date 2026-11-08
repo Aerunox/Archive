@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
@@ -228,18 +229,7 @@ fun TranslationSettingsScreen(
     navController: NavHostController,
     viewModel: TranslationSettingsViewModel = hiltViewModel(),
 ) {
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
-    val connTesting by viewModel.connTesting.collectAsStateWithLifecycle()
-    val connResult by viewModel.connResult.collectAsStateWithLifecycle()
-    val visionTesting by viewModel.visionTesting.collectAsStateWithLifecycle()
-    val visionResult by viewModel.visionResult.collectAsStateWithLifecycle()
-    val colors = LocalPurrColors.current
-
-    // 档案编辑态：editing != null 是编辑既有档案；adding 是新增
-    var editing by remember { mutableStateOf<ModelProfile?>(null) }
-    var adding by remember { mutableStateOf(false) }
-    val editorOpen = adding || editing != null
-
+    val editorState = rememberAiSettingsEditorState()
     AppScaffold(topBar = {
         AppTopBar(
             title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.ai_settings_title),
@@ -254,265 +244,336 @@ fun TranslationSettingsScreen(
             contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // ── 概览 ──
-            item {
-                SettingsCard(verticalSpacing = 6.dp) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AppText(
-                            androidx.compose.ui.res.stringResource(com.archive.app.R.string.ai_overview_title),
-                            style = AppTextStyle.MAIN,
-                            color = colors.textPrimary,
-                        )
-                        Spacer(Modifier.weight(1f))
-                        StatusPill(
-                            text = androidx.compose.ui.res.stringResource(
-                                if (settings.configured) com.archive.app.R.string.status_configured
-                                else com.archive.app.R.string.status_pending,
-                            ),
-                            highlight = settings.configured,
-                        )
-                    }
-                    AppText(
-                        androidx.compose.ui.res.stringResource(com.archive.app.R.string.ai_overview_summary),
-                        style = AppTextStyle.SMALL,
-                        color = colors.textTertiary,
-                    )
-                }
-            }
-
-            // ── 自动翻译 ──
-            item {
-                SettingsCard(
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    verticalSpacing = 0.dp,
-                ) {
-                    com.archive.app.ui.design.AppSwitchSetting(
-                        title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.auto_translate),
-                        checked = settings.autoTranslate,
-                        onCheckedChange = viewModel::setAutoTranslate,
-                        summary = androidx.compose.ui.res.stringResource(
-                            com.archive.app.R.string.auto_translate_summary,
-                        ),
-                    )
-                }
-            }
-
-            // ── 模型档案：添加 / 编辑 / 删除 ──
-            item {
-                AppSmallTitle(
-                    androidx.compose.ui.res.stringResource(com.archive.app.R.string.section_profiles),
-                )
-            }
-            item {
-                SettingsCard(verticalSpacing = 10.dp) {
-                    if (settings.profiles.isEmpty()) {
-                        AppText(
-                            androidx.compose.ui.res.stringResource(com.archive.app.R.string.profiles_empty),
-                            style = AppTextStyle.SMALL,
-                            color = colors.textTertiary,
-                        )
-                    }
-                    settings.profiles.forEach { profile ->
-                        ProfileRow(
-                            profile = profile,
-                            onEdit = { editing = profile },
-                            onDelete = { viewModel.deleteProfile(profile.id) },
-                        )
-                    }
-                    if (!editorOpen) {
-                        AppButton(
-                            text = androidx.compose.ui.res.stringResource(com.archive.app.R.string.profile_add),
-                            onClick = { adding = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            primary = false,
-                        )
-                    }
-                }
-            }
-
-            if (editorOpen) {
-                item {
-                    ProfileEditorCard(
-                        initial = editing,
-                        onSave = {
-                            viewModel.upsertProfile(it)
-                            adding = false
-                            editing = null
-                        },
-                        onCancel = {
-                            adding = false
-                            editing = null
-                        },
-                    )
-                }
-            }
-
-            // ── 用途分配 ──
-            item {
-                AppSmallTitle(
-                    androidx.compose.ui.res.stringResource(com.archive.app.R.string.section_purposes),
-                )
-            }
-            item {
-                SettingsCard(verticalSpacing = 4.dp) {
-                    if (settings.profiles.isEmpty()) {
-                        AppText(
-                            androidx.compose.ui.res.stringResource(com.archive.app.R.string.purposes_empty),
-                            style = AppTextStyle.SMALL,
-                            color = colors.textTertiary,
-                        )
-                    }
-                    PurposeDropdown(
-                        title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.purpose_translation),
-                        summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.purpose_translation_summary),
-                        profiles = settings.profiles,
-                        assignedId = settings.translationProfileId,
-                        onSelect = { viewModel.assignPurpose(AiPurpose.TRANSLATION, it) },
-                    )
-                    PurposeDropdown(
-                        title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.purpose_vision),
-                        summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.purpose_vision_summary),
-                        profiles = settings.profiles,
-                        assignedId = settings.visionProfileId,
-                        onSelect = { viewModel.assignPurpose(AiPurpose.VISION, it) },
-                    )
-                }
-            }
-
-            // ── 测试：各自走对应用途的档案 ──
-            item {
-                AppSmallTitle(
-                    androidx.compose.ui.res.stringResource(com.archive.app.R.string.section_test),
-                )
-            }
-            item {
-                SettingsCard(verticalSpacing = 10.dp) {
-                    AppText(
-                        androidx.compose.ui.res.stringResource(com.archive.app.R.string.test_summary),
-                        style = AppTextStyle.SMALL,
-                        color = colors.textTertiary,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        AppButton(
-                            text = androidx.compose.ui.res.stringResource(
-                                if (connTesting) com.archive.app.R.string.test_running
-                                else com.archive.app.R.string.test_connection,
-                            ),
-                            onClick = { viewModel.testConnection() },
-                            modifier = Modifier.weight(1f),
-                            primary = false,
-                            enabled = !connTesting,
-                        )
-                        AppButton(
-                            text = androidx.compose.ui.res.stringResource(
-                                if (visionTesting) com.archive.app.R.string.test_running
-                                else com.archive.app.R.string.test_vision,
-                            ),
-                            onClick = { viewModel.testVision() },
-                            modifier = Modifier.weight(1f),
-                            primary = false,
-                            enabled = !visionTesting,
-                        )
-                    }
-                    connResult?.let { TestResultLine(it) }
-                    visionResult?.let { TestResultLine(it) }
-                }
-            }
-
-            // ── 推理与联网 ──
-            item {
-                AppSmallTitle(
-                    androidx.compose.ui.res.stringResource(com.archive.app.R.string.section_thinking),
-                )
-            }
-            item {
-                SettingsCard(
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    verticalSpacing = 0.dp,
-                ) {
-                    com.archive.app.ui.components.AiAdvancedSettingsSection(
-                        deepThinking = settings.deepThinking,
-                        thinkingLevel = settings.thinkingLevel,
-                        webSearch = settings.webSearch,
-                        onDeepThinkingChange = viewModel::setDeepThinking,
-                        onThinkingLevelChange = viewModel::setThinkingLevel,
-                        onWebSearchChange = viewModel::setWebSearch,
-                    )
-                }
-            }
-
-            // ── 翻译提示词 ──
-            item {
-                AppSmallTitle(
-                    androidx.compose.ui.res.stringResource(com.archive.app.R.string.section_prompt),
-                )
-            }
-            item {
-                SettingsCard {
-                    SettingField(
-                        label = androidx.compose.ui.res.stringResource(com.archive.app.R.string.prompt_label),
-                        value = settings.prompt,
-                        onValueChange = viewModel::setPrompt,
-                        hint = androidx.compose.ui.res.stringResource(com.archive.app.R.string.prompt_hint),
-                        singleLine = false,
-                    )
-                }
-            }
-
-            // ── 采样参数 ──
-            item {
-                AppSmallTitle(
-                    androidx.compose.ui.res.stringResource(com.archive.app.R.string.section_sampling),
-                )
-            }
-            item {
-                SettingsCard(
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                    verticalSpacing = 8.dp,
-                ) {
-                    AppSliderSetting(
-                        title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_temperature),
-                        summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_temperature_summary),
-                        value = settings.temperature,
-                        onValueChange = viewModel::setTemperature,
-                        valueRange = 0f..2f,
-                        valueText = "%.2f".format(settings.temperature),
-                    )
-                    AppSliderSetting(
-                        title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_top_p),
-                        summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_top_p_summary),
-                        value = settings.topP,
-                        onValueChange = viewModel::setTopP,
-                        valueRange = 0f..1f,
-                        valueText = "%.2f".format(settings.topP),
-                    )
-                    AppSliderSetting(
-                        title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_max_tokens),
-                        summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_max_tokens_summary),
-                        value = settings.maxTokens.toFloat(),
-                        onValueChange = { viewModel.setMaxTokens(it.toInt()) },
-                        valueRange = 128f..8192f,
-                        valueText = settings.maxTokens.toString(),
-                    )
-                    AppSliderSetting(
-                        title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_freq),
-                        summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_freq_summary),
-                        value = settings.frequencyPenalty,
-                        onValueChange = viewModel::setFrequencyPenalty,
-                        valueRange = -2f..2f,
-                        valueText = "%.2f".format(settings.frequencyPenalty),
-                    )
-                    AppSliderSetting(
-                        title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_pres),
-                        summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_pres_summary),
-                        value = settings.presencePenalty,
-                        onValueChange = viewModel::setPresencePenalty,
-                        valueRange = -2f..2f,
-                        valueText = "%.2f".format(settings.presencePenalty),
-                    )
-                }
-            }
+            item { AiSettingsColumn(viewModel, editorState) }
         }
+    }
+}
+
+/**
+ * 档案编辑态（编辑既有 / 新增一个档案）。
+ *
+ * 提出来单独持有，是因为「我 → 设置 → AI 功能」把各配置区块拆成了多个列表项，
+ * 编辑态要跨列表项共用，不能放进某一个重组作用域里。
+ */
+class AiSettingsEditorState {
+    var editing by mutableStateOf<ModelProfile?>(null)
+    var adding by mutableStateOf(false)
+
+    val editorOpen: Boolean get() = adding || editing != null
+
+    fun edit(profile: ModelProfile) {
+        editing = profile
+        adding = false
+    }
+
+    fun startAdd() {
+        adding = true
+        editing = null
+    }
+
+    fun close() {
+        adding = false
+        editing = null
+    }
+}
+
+@Composable
+fun rememberAiSettingsEditorState(): AiSettingsEditorState = remember { AiSettingsEditorState() }
+
+/**
+ * AI 设置的全部配置区块，纵向排列成一个整体。
+ *
+ * 独立页（首页菜单「AI 设置」）与「我 → 设置 → AI 功能」共用这一份定义：
+ * 两处只有外壳不同，配置项一行都不用重复写。
+ *
+ * 刻意保持「一个整体」而不是拆成多个 LazyColumn item：设置页的分类详情每帧都会
+ * 重建分组列表，拆成多个 item 后这些 item 的身份每帧都变，列表会被不断重新布局、
+ * 滚动位置被拉回顶部（实测滚不动）。
+ */
+@Composable
+fun AiSettingsColumn(
+    viewModel: TranslationSettingsViewModel,
+    editorState: AiSettingsEditorState,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        AiOverviewCard(viewModel)
+        AiAutoTranslateCard(viewModel)
+        AiSectionTitle(androidx.compose.ui.res.stringResource(com.archive.app.R.string.section_profiles))
+        AiProfilesCard(viewModel, editorState)
+        if (editorState.editorOpen) {
+            AiProfileEditorSection(viewModel, editorState)
+        }
+        AiSectionTitle(androidx.compose.ui.res.stringResource(com.archive.app.R.string.section_purposes))
+        AiPurposesCard(viewModel)
+        AiSectionTitle(androidx.compose.ui.res.stringResource(com.archive.app.R.string.section_test))
+        AiTestCard(viewModel)
+        AiSectionTitle(androidx.compose.ui.res.stringResource(com.archive.app.R.string.section_thinking))
+        AiThinkingCard(viewModel)
+        AiSectionTitle(androidx.compose.ui.res.stringResource(com.archive.app.R.string.section_prompt))
+        AiPromptCard(viewModel)
+        AiSectionTitle(androidx.compose.ui.res.stringResource(com.archive.app.R.string.section_sampling))
+        AiSamplingCard(viewModel)
+    }
+}
+
+@Composable
+private fun AiSectionTitle(text: String) = AppSmallTitle(text)
+
+/** 概览：配置状态胶囊 + 一句说明。 */
+@Composable
+fun AiOverviewCard(viewModel: TranslationSettingsViewModel) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val colors = LocalPurrColors.current
+    SettingsCard(verticalSpacing = 6.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AppText(
+                androidx.compose.ui.res.stringResource(com.archive.app.R.string.ai_overview_title),
+                style = AppTextStyle.MAIN,
+                color = colors.textPrimary,
+            )
+            Spacer(Modifier.weight(1f))
+            StatusPill(
+                text = androidx.compose.ui.res.stringResource(
+                    if (settings.configured) com.archive.app.R.string.status_configured
+                    else com.archive.app.R.string.status_pending,
+                ),
+                highlight = settings.configured,
+            )
+        }
+        AppText(
+            androidx.compose.ui.res.stringResource(com.archive.app.R.string.ai_overview_summary),
+            style = AppTextStyle.SMALL,
+            color = colors.textTertiary,
+        )
+    }
+}
+
+/** 自动翻译开关。 */
+@Composable
+fun AiAutoTranslateCard(viewModel: TranslationSettingsViewModel) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    SettingsCard(
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+        verticalSpacing = 0.dp,
+    ) {
+        com.archive.app.ui.design.AppSwitchSetting(
+            title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.auto_translate),
+            checked = settings.autoTranslate,
+            onCheckedChange = viewModel::setAutoTranslate,
+            summary = androidx.compose.ui.res.stringResource(
+                com.archive.app.R.string.auto_translate_summary,
+            ),
+        )
+    }
+}
+
+/** 模型档案列表 + 「添加档案」按钮。 */
+@Composable
+fun AiProfilesCard(
+    viewModel: TranslationSettingsViewModel,
+    editorState: AiSettingsEditorState,
+) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val colors = LocalPurrColors.current
+    SettingsCard(verticalSpacing = 10.dp) {
+        if (settings.profiles.isEmpty()) {
+            AppText(
+                androidx.compose.ui.res.stringResource(com.archive.app.R.string.profiles_empty),
+                style = AppTextStyle.SMALL,
+                color = colors.textTertiary,
+            )
+        }
+        settings.profiles.forEach { profile ->
+            ProfileRow(
+                profile = profile,
+                onEdit = { editorState.edit(profile) },
+                onDelete = { viewModel.deleteProfile(profile.id) },
+            )
+        }
+        if (!editorState.editorOpen) {
+            AppButton(
+                text = androidx.compose.ui.res.stringResource(com.archive.app.R.string.profile_add),
+                onClick = { editorState.startAdd() },
+                modifier = Modifier.fillMaxWidth(),
+                primary = false,
+            )
+        }
+    }
+}
+
+/** 档案编辑器（新增 / 编辑共用）。 */
+@Composable
+fun AiProfileEditorSection(
+    viewModel: TranslationSettingsViewModel,
+    editorState: AiSettingsEditorState,
+) {
+    ProfileEditorCard(
+        initial = editorState.editing,
+        onSave = {
+            viewModel.upsertProfile(it)
+            editorState.close()
+        },
+        onCancel = { editorState.close() },
+    )
+}
+
+/** 用途指派：翻译帖子 / 识别图片 各选一个档案。 */
+@Composable
+fun AiPurposesCard(viewModel: TranslationSettingsViewModel) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val colors = LocalPurrColors.current
+    SettingsCard(verticalSpacing = 4.dp) {
+        if (settings.profiles.isEmpty()) {
+            AppText(
+                androidx.compose.ui.res.stringResource(com.archive.app.R.string.purposes_empty),
+                style = AppTextStyle.SMALL,
+                color = colors.textTertiary,
+            )
+        }
+        PurposeDropdown(
+            title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.purpose_translation),
+            summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.purpose_translation_summary),
+            profiles = settings.profiles,
+            assignedId = settings.translationProfileId,
+            onSelect = { viewModel.assignPurpose(AiPurpose.TRANSLATION, it) },
+        )
+        PurposeDropdown(
+            title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.purpose_vision),
+            summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.purpose_vision_summary),
+            profiles = settings.profiles,
+            assignedId = settings.visionProfileId,
+            onSelect = { viewModel.assignPurpose(AiPurpose.VISION, it) },
+        )
+    }
+}
+
+/** 连通性与识图测试。 */
+@Composable
+fun AiTestCard(viewModel: TranslationSettingsViewModel) {
+    val connTesting by viewModel.connTesting.collectAsStateWithLifecycle()
+    val connResult by viewModel.connResult.collectAsStateWithLifecycle()
+    val visionTesting by viewModel.visionTesting.collectAsStateWithLifecycle()
+    val visionResult by viewModel.visionResult.collectAsStateWithLifecycle()
+    val colors = LocalPurrColors.current
+    SettingsCard(verticalSpacing = 10.dp) {
+        AppText(
+            androidx.compose.ui.res.stringResource(com.archive.app.R.string.test_summary),
+            style = AppTextStyle.SMALL,
+            color = colors.textTertiary,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            AppButton(
+                text = androidx.compose.ui.res.stringResource(
+                    if (connTesting) com.archive.app.R.string.test_running
+                    else com.archive.app.R.string.test_connection,
+                ),
+                onClick = { viewModel.testConnection() },
+                modifier = Modifier.weight(1f),
+                primary = false,
+                enabled = !connTesting,
+            )
+            AppButton(
+                text = androidx.compose.ui.res.stringResource(
+                    if (visionTesting) com.archive.app.R.string.test_running
+                    else com.archive.app.R.string.test_vision,
+                ),
+                onClick = { viewModel.testVision() },
+                modifier = Modifier.weight(1f),
+                primary = false,
+                enabled = !visionTesting,
+            )
+        }
+        connResult?.let { TestResultLine(it) }
+        visionResult?.let { TestResultLine(it) }
+    }
+}
+
+/** 推理与联网开关。 */
+@Composable
+fun AiThinkingCard(viewModel: TranslationSettingsViewModel) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    SettingsCard(
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+        verticalSpacing = 0.dp,
+    ) {
+        com.archive.app.ui.components.AiAdvancedSettingsSection(
+            deepThinking = settings.deepThinking,
+            thinkingLevel = settings.thinkingLevel,
+            webSearch = settings.webSearch,
+            onDeepThinkingChange = viewModel::setDeepThinking,
+            onThinkingLevelChange = viewModel::setThinkingLevel,
+            onWebSearchChange = viewModel::setWebSearch,
+        )
+    }
+}
+
+/** 翻译提示词。 */
+@Composable
+fun AiPromptCard(viewModel: TranslationSettingsViewModel) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    SettingsCard {
+        SettingField(
+            label = androidx.compose.ui.res.stringResource(com.archive.app.R.string.prompt_label),
+            value = settings.prompt,
+            onValueChange = viewModel::setPrompt,
+            hint = androidx.compose.ui.res.stringResource(com.archive.app.R.string.prompt_hint),
+            singleLine = false,
+        )
+    }
+}
+
+/** 采样参数：温度 / top_p / 最大 token / 频率与存在惩罚。 */
+@Composable
+fun AiSamplingCard(viewModel: TranslationSettingsViewModel) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    SettingsCard(
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+        verticalSpacing = 8.dp,
+    ) {
+        AppSliderSetting(
+            title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_temperature),
+            summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_temperature_summary),
+            value = settings.temperature,
+            onValueChange = viewModel::setTemperature,
+            valueRange = 0f..2f,
+            valueText = "%.2f".format(settings.temperature),
+        )
+        AppSliderSetting(
+            title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_top_p),
+            summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_top_p_summary),
+            value = settings.topP,
+            onValueChange = viewModel::setTopP,
+            valueRange = 0f..1f,
+            valueText = "%.2f".format(settings.topP),
+        )
+        AppSliderSetting(
+            title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_max_tokens),
+            summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_max_tokens_summary),
+            value = settings.maxTokens.toFloat(),
+            onValueChange = { viewModel.setMaxTokens(it.toInt()) },
+            valueRange = 128f..8192f,
+            valueText = settings.maxTokens.toString(),
+        )
+        AppSliderSetting(
+            title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_freq),
+            summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_freq_summary),
+            value = settings.frequencyPenalty,
+            onValueChange = viewModel::setFrequencyPenalty,
+            valueRange = -2f..2f,
+            valueText = "%.2f".format(settings.frequencyPenalty),
+        )
+        AppSliderSetting(
+            title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_pres),
+            summary = androidx.compose.ui.res.stringResource(com.archive.app.R.string.sampling_pres_summary),
+            value = settings.presencePenalty,
+            onValueChange = viewModel::setPresencePenalty,
+            valueRange = -2f..2f,
+            valueText = "%.2f".format(settings.presencePenalty),
+        )
     }
 }
 

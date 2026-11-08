@@ -16,7 +16,15 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private val Context.settingsDataStore by preferencesDataStore(name = "archive_settings")
+// 文件损坏（写盘中途进程被杀等）时抛 CorruptionException，sessionCookie/baseUrl 的
+// runCatching 会静默吞成默认值——登录态与自定义域名永久失效且无提示；替换为空偏好可恢复。
+@Suppress("MissingPermission")
+private val Context.settingsDataStore by preferencesDataStore(
+    name = "archive_settings",
+    corruptionHandler = androidx.datastore.core.handlers.ReplaceFileCorruptionHandler {
+        androidx.datastore.preferences.core.emptyPreferences()
+    },
+)
 
 data class AppSettings(
     val colorMode: AppColorMode = AppColorMode.FOLLOW_SYSTEM,

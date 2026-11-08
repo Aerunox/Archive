@@ -101,6 +101,14 @@ class SearchViewModel @Inject constructor(
         /** 帖子排序：与首页/收藏/作者页共用同一套排序方式。 */
         val postSort: PostSortMode = PostSortMode.RELEVANCE,
         val creatorSort: CreatorSort = CreatorSort.RELEVANCE,
+        /**
+         * 当前帖子结果对应的关键词（提交时确定）。
+         *
+         * 与 [query]（输入框实时值）不同即表示「结果已过期」：帖子只在提交时请求，
+         * 用户改词但还没按搜索时，列表仍是上一次关键词的结果，UI 需要明确提示，
+         * 否则会被误读成新关键词的搜索结果。
+         */
+        val postResultsQuery: String = "",
     )
 
     private val _state = MutableStateFlow(UiState())
@@ -109,6 +117,17 @@ class SearchViewModel @Inject constructor(
     val history: MutableStateFlow<List<String>> = MutableStateFlow(searchHistoryManager.getHistory())
 
     private var searchJob: Job? = null
+
+    /** 输入触发的本地创作者过滤任务：每次输入都取消上一次，避免旧关键词结果最后写入。 */
+    private var creatorFilterJob: Job? = null
+
+    /**
+     * 最近一次**已提交**（真正发起请求）的关键词。
+     *
+     * 判断「是不是新的一次搜索」只能拿它比：`_state.value.query` 在输入时就已经被
+     * [onQueryChange] 改成新输入了，提交时两者必然相等，用它会永远判成 false。
+     */
+    private var lastSubmittedQuery: String? = null
 
     /** 最近一次搜索的原始结果（未排序），切换排序时重新计算。 */
     private var rawPosts: List<PostSummary> = emptyList()
@@ -124,7 +143,7 @@ class SearchViewModel @Inject constructor(
                 favedIndex = index
                 if (rawPosts.isNotEmpty()) {
                     _state.value = _state.value.copy(
-                        postResults = sortPosts(rawPosts, _state.value.postSort, _state.value.query),
+                        postResults = sortPosts(rawPosts, _state.value.postSort, _state.value.postResultsQuery),
                     )
                 }
             }
@@ -133,7 +152,11 @@ class SearchViewModel @Inject constructor(
 
     fun setPostSort(sort: PostSortMode) {
         if (sort.needsFavedSeq) viewModelScope.launch { favoriteSeqRepository.ensureLoaded() }
-        _state.value = _state.value.copy(postSort = sort, postResults = sortPosts(rawPosts, sort, _state.value.query))
+        // 相关度按「结果对应的关键词」算：输入框里可能已经改成还没提交的新词
+        _state.value = _state.value.copy(
+            postSort = sort,
+            postResults = sortPosts(rawPosts, sort, _state.value.postResultsQuery),
+        )
     }
 
     fun setCreatorSort(sort: CreatorSort) {
@@ -150,6 +173,14 @@ class SearchViewModel @Inject constructor(
     private fun sortPosts(list: List<PostSummary>, sort: PostSortMode, query: String): List<PostSummary> =
         list.sortedFor(sort, query, favedIndex)
 
+    /**
+     * 创作者排序。
+     *
+     * [CreatorSort.RELEVANCE] 是真正的「相关度」而不是「收藏数排序」：先按**名称命中质量**
+     * 分档（精确 pid 命中 > 名称完全相同 > 名称前缀 > 名称包含 > 仅 id 包含），同档内再按
+     * 收藏数、名称兜底。与发现页 `CreatorDao.paging` 里那套相关度分档保持一致——
+     * 只按收藏数排的话，普通名称查询下「相关度」标签与实际顺序是不符的。
+     */
     private fun sortCreators(
         list: List<CreatorEntity>,
         sort: CreatorSort,
@@ -157,33 +188,61 @@ class SearchViewModel @Inject constructor(
     ): List<CreatorEntity> = when (sort) {
         CreatorSort.RELEVANCE -> {
             val pid = extractPixivPid(query)
-            list.sortedWith(
-                compareByDescending<CreatorEntity> { pid != null && it.id == pid }
-                    .thenByDescending { it.favorited },
-            )
+            val keyword = query.trim().lowercase()
+            if (keyword.isEmpty()) {
+                list.sortedWith(compareByDescending<CreatorEntity> { it.favorited })
+            } else {
+                list.sortedWith(
+                    compareBy<CreatorEntity> { creatorMatchRank(it, pid, keyword) }
+                        .thenByDescending { it.favorited }
+                        .thenBy { it.name.lowercase() },
+                )
+            }
         }
         CreatorSort.NAME_ASC -> list.sortedBy { it.name.lowercase() }
         CreatorSort.NAME_DESC -> list.sortedByDescending { it.name.lowercase() }
+    }
+
+    /** 相关度分档：0=pid 精确命中，1=名称完全相同，2=名称前缀，3=名称包含，4=其余（仅 id 包含）。 */
+    private fun creatorMatchRank(creator: CreatorEntity, pid: String?, keyword: String): Int {
+        if (pid != null && creator.id == pid) return 0
+        val name = creator.name.lowercase()
+        return when {
+            name == keyword -> 1
+            name.startsWith(keyword) -> 2
+            name.contains(keyword) -> 3
+            else -> 4
+        }
     }
 
     /** 输入变化：只更新关键词并做本地创作者过滤（不发网络请求）。 */
     fun onQueryChange(text: String) {
         _state.value = _state.value.copy(query = text)
         if (text.isBlank()) {
+            creatorFilterJob?.cancel()
+            // 清空输入 = 回到初始状态：在途请求也一并放弃，否则它的结果会被下面的守卫丢掉、
+            // loading 永远停不下来。下一次提交一律按「新搜索」处理。
+            searchJob?.cancel()
+            lastSubmittedQuery = null
             rawPosts = emptyList()
             rawCreators = emptyList()
             _state.value = _state.value.copy(
                 postResults = emptyList(),
                 discordHits = emptyList(),
                 creatorResults = emptyList(),
+                loading = false,
                 error = null,
                 hint = null,
                 hashMode = false,
+                postResultsQuery = "",
             )
             return
         }
-        // 输入时实时过滤本地创作者（照 Pawchive 的 onQueryTextChange）
-        viewModelScope.launch { filterCreators(text) }
+        // 输入时实时过滤本地创作者（照 Pawchive 的 onQueryTextChange）。
+        // 每次输入都取消上一次过滤：数据库查询是异步的，不取消的话先发出的旧关键词
+        // 可能后返回，把新关键词的结果覆盖掉。
+        creatorFilterJob?.cancel()
+        creatorFilterJob = viewModelScope.launch { filterCreators(text) }
     }
 
     fun onTabSelected(tab: Tab) {
@@ -199,9 +258,12 @@ class SearchViewModel @Inject constructor(
         searchHistoryManager.addHistory(query)
         history.value = searchHistoryManager.getHistory()
         searchJob?.cancel()
+        creatorFilterJob?.cancel()
         // 换了关键词就是「新的一次搜索」：排序回到默认的「相关度」，
-        // 不把上一次结果里手动挑的排序方式带过来（同一关键词重新提交则保留用户的选择）
-        val isNewQuery = query != _state.value.query
+        // 不把上一次结果里手动挑的排序方式带过来（同一关键词重新提交则保留用户的选择）。
+        // 比的是「上一次提交的词」而不是输入框里的词——后者在输入时就已更新，比不出差异。
+        val isNewQuery = query != lastSubmittedQuery
+        lastSubmittedQuery = query
         _state.value = _state.value.copy(
             query = query,
             loading = true,
@@ -231,7 +293,10 @@ class SearchViewModel @Inject constructor(
     private suspend fun runPostsSearch(query: String) {
         val hash = extractFileHash(query)
         if (hash != null) {
-            runCatching { postRepository.searchByHash(hash) }
+            val outcome = runSearch { postRepository.searchByHash(hash) }
+            // 已被更新的提交取代：丢掉过期结果，也别把 loading 提前关掉（新请求还在跑）
+            if (lastSubmittedQuery != query) return
+            outcome
                 .onSuccess { result ->
                     rawPosts = result.sitePosts
                     _state.value = _state.value.copy(
@@ -239,6 +304,7 @@ class SearchViewModel @Inject constructor(
                         discordHits = result.discordHits,
                         loading = false,
                         hashMode = true,
+                        postResultsQuery = query,
                         hint = if (result.sitePosts.isEmpty() && result.discordHits.isEmpty()) {
                             "没有帖子使用该文件"
                         } else {
@@ -255,7 +321,9 @@ class SearchViewModel @Inject constructor(
                 }
             return
         }
-        runCatching { postRepository.searchPosts(query) }
+        val outcome = runSearch { postRepository.searchPosts(query) }
+        if (lastSubmittedQuery != query) return
+        outcome
             .onSuccess { posts ->
                 rawPosts = posts
                 _state.value = _state.value.copy(
@@ -263,6 +331,7 @@ class SearchViewModel @Inject constructor(
                     discordHits = emptyList(),
                     loading = false,
                     hashMode = false,
+                    postResultsQuery = query,
                     hint = if (posts.isEmpty()) "没有找到相关帖子" else null,
                 )
             }
@@ -275,15 +344,45 @@ class SearchViewModel @Inject constructor(
             }
     }
 
+    /**
+     * 同 `runCatching`，但**把协程取消继续抛出去**。
+     *
+     * `runCatching` 会把 `CancellationException` 也抓成 failure，被 `searchJob.cancel()`
+     * 取消的旧请求于是照样执行 `onFailure`，把 `loading` 提前置 false（新请求其实还没回来），
+     * 或者用最后一份过期数据覆盖新结果。
+     */
+    private suspend fun <T> runSearch(block: suspend () -> T): Result<T> =
+        try {
+            Result.success(block())
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            Result.failure(error)
+        }
+
     private suspend fun filterCreators(query: String, finishLoading: Boolean = false) {
         val pid = extractPixivPid(query)
-        val result = runCatching {
+        val outcome = runSearch {
             if (pid != null) {
                 creatorRepository.byId(pid) + creatorRepository.searchByNameOrId(query)
             } else {
                 creatorRepository.searchByNameOrId(query)
             }
-        }.getOrDefault(emptyList())
+        }
+        // 输入框已经不是这个词了（或已有更新的提交）：丢弃过期结果
+        if (_state.value.query != query) return
+        // 查询失败不能当成「没有匹配」：本地库出错和关键词无结果是两回事，
+        // 转成空列表会清掉 error 并显示「没有匹配的创作者」，把用户误导到关键词上。
+        val failure = outcome.exceptionOrNull()
+        if (failure != null) {
+            _state.value = _state.value.copy(
+                loading = if (finishLoading) false else _state.value.loading,
+                error = "本地作者库查询失败：${friendlyError(failure)}",
+                hint = null,
+            )
+            return
+        }
+        val result = outcome.getOrDefault(emptyList())
             .distinctBy { it.service to it.id }
             // 精确 id 命中排最前（照 Pawchive 的 exactId 处理）
             .sortedWith(
@@ -444,6 +543,20 @@ fun GlobalSearchScreen(
                         options = SearchViewModel.CreatorSort.entries.map { it.label },
                         selected = state.creatorSort.ordinal,
                     ) { index -> viewModel.setCreatorSort(SearchViewModel.CreatorSort.entries[index]) }
+                }
+
+                // 帖子只在提交时请求：改了输入但还没按搜索时，列表仍是上一次关键词的结果。
+                // 明确标出「这批结果对应哪个词」，否则会让人以为它们匹配当前输入。
+                val currentQuery = state.query.trim()
+                if (state.tab == SearchViewModel.Tab.POSTS &&
+                    state.postResultsQuery.isNotBlank() &&
+                    currentQuery != state.postResultsQuery
+                ) {
+                    AppText(
+                        "以下是「${state.postResultsQuery}」的结果，按搜索键搜索「$currentQuery」",
+                        style = AppTextStyle.SMALL,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    )
                 }
             }
 

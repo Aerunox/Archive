@@ -84,11 +84,19 @@ class BookmarkManager @Inject constructor(
     fun bookmarkPost(post: Post) {
         ensureLoaded()
         val objectKey = getPostObjectKey(post.service, post.user, post.id)
+        // 标记 + 对象 + 顺序表必须同事务：拆成两次 DataStore 写的话，中间进程被杀
+        // 或第二次写盘失败，就会出现"对象在但列表看不到"或顺序表残留死 key
+        // （getBookmarkedPosts 只按顺序表遍历）。
         editSync { prefs ->
             prefs[getPostKey(post.service, post.user, post.id)] = true
             prefs[objectKey] = gson.toJson(post)
+            val current = prefs[orderedPostKeysKey]
+                ?.split(separator)?.filter { it.isNotEmpty() }
+                ?: emptyList()
+            if (objectKey.name !in current) {
+                prefs[orderedPostKeysKey] = (current + objectKey.name).joinToString(separator)
+            }
         }
-        appendOrderedKey(objectKey.name)
     }
 
     fun unbookmarkPost(service: String, creatorId: String, postId: String) {
@@ -97,8 +105,13 @@ class BookmarkManager @Inject constructor(
         editSync { prefs ->
             prefs.remove(getPostKey(service, creatorId, postId))
             prefs.remove(objectKey)
+            val current = prefs[orderedPostKeysKey]
+                ?.split(separator)?.filter { it.isNotEmpty() }
+                ?: emptyList()
+            if (objectKey.name in current) {
+                prefs[orderedPostKeysKey] = (current - objectKey.name).joinToString(separator)
+            }
         }
-        removeFromOrdered(objectKey.name)
     }
 
     fun isPostBookmarked(service: String, creatorId: String, postId: String): Boolean {
@@ -260,22 +273,6 @@ class BookmarkManager @Inject constructor(
         editSync { it[orderedPostKeysKey] = keys.joinToString(separator) }
     }
 
-    private fun appendOrderedKey(key: String) {
-        ensureLoaded()
-        val current = getOrderedKeys()
-        if (key !in current) {
-            saveOrderedKeys(current + key)
-        }
-    }
-
-    private fun removeFromOrdered(key: String) {
-        ensureLoaded()
-        val current = getOrderedKeys()
-        if (key in current) {
-            saveOrderedKeys(current - key)
-        }
-    }
-
     /**
      * 同步更新内存缓存（保证 UI 立即可见）+ 串行、带异常处理地落盘（P1）。
      *
@@ -287,11 +284,18 @@ class BookmarkManager @Inject constructor(
         runBlocking(Dispatchers.IO) {
             writeMutex.withLock {
                 // 先更新内存缓存（保证后续同步读取立即可见）
+                val before = cache
                 cache = cache.toMutablePreferences().apply { block(this) }
-                // 同步落盘（在 IO 线程阻塞等待，由 Mutex 串行化并发写入）
-                val updated = runCatching { dataStore.edit(block) }.getOrDefault(cache)
-                // 以磁盘最新状态刷新内存快照，保持权威一致
-                cache = updated
+                // 同步落盘（在 IO 线程阻塞等待，由 Mutex 串行化并发写入）。
+                // 落盘失败必须回滚内存缓存并上抛：此前 getOrDefault(cache) 把失败吞成
+                // "内存已改、磁盘没写"的假成功，重启后收藏/设置凭空回退且无任何日志。
+                runCatching { dataStore.edit(block) }
+                    .onSuccess { cache = it }
+                    .onFailure { e ->
+                        cache = before
+                        Log.w("BookmarkManager", "editSync persist failed", e)
+                        throw e
+                    }
             }
         }
     }

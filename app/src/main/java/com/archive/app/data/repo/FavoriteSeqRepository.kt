@@ -47,8 +47,10 @@ class FavoriteSeqRepository @Inject constructor(
         }
         if (all.isNotEmpty()) {
             _index.value = FavedSeqIndex.from(all)
-            loaded = true
         }
+        // 成功走完分页（含零收藏：首页即空）都要置 loaded，否则零收藏用户
+        // 每次切"按收藏时间排序"都会重新拉满 5 页（站点限流严格，429 连锁）。
+        loaded = true
     }
 
     private companion object {

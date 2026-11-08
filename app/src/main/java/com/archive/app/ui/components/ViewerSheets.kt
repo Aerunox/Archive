@@ -19,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import com.archive.app.ui.design.AppSpinner
 import com.archive.app.ui.design.AppText
 import com.archive.app.ui.design.AppTextStyle
 import com.archive.app.ui.design.lucide.LucideIcons
@@ -325,7 +325,7 @@ fun OcrResultSheet(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        CircularProgressIndicator(color = colors.primary)
+                        AppSpinner(size = 24.dp, color = colors.primary)
                         AppText(
                             "正在识别…",
                             style = AppTextStyle.SMALL,

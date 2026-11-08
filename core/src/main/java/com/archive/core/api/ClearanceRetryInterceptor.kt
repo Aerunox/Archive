@@ -24,9 +24,6 @@ import java.util.concurrent.TimeoutException
  */
 object ClearanceRetryInterceptor {
 
-    // 用于构造"过盾未完成"占位响应（避免依赖已关闭的响应体）
-    private val EMPTY_RESPONSE_BODY = ByteArray(0).toResponseBody("text/plain".toMediaType())
-
     // 专用单线程 executor：仅用于 Cloudflare 过盾阻塞等待，隔离 OkHttp 线程池
     private val cfExecutor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "Pawchive-CF-Clearance").apply { isDaemon = true }
@@ -70,13 +67,15 @@ object ClearanceRetryInterceptor {
             chain.proceed(rebuiltRequest)
         } else {
             // 过盾失败/超时，返回 403 占位响应（而非抛异常），
-            // 让 Coil/Retrofit 能正常将其作为加载失败处理
+            // 让 Coil/Retrofit 能正常将其作为加载失败处理。
+            // 响应体每次新建：单例 ResponseBody 只能被消费一次，第二次读取
+            // 得到空/已关闭的 body，下游解析报诡异异常。
             Response.Builder()
                 .request(request)
                 .protocol(Protocol.HTTP_1_1)
                 .code(403)
                 .message("Cloudflare clearance failed")
-                .body(EMPTY_RESPONSE_BODY)
+                .body(ByteArray(0).toResponseBody("text/plain".toMediaType()))
                 .build()
         }
     }

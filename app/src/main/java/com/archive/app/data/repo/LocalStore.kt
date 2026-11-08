@@ -7,16 +7,27 @@ import com.archive.app.data.FavoriteRecord
 import com.archive.app.data.local.AppDatabase
 import com.archive.app.data.local.FavoritePostEntity
 import com.archive.app.data.local.HistoryEntity
+import com.archive.core.db.OfflineArchiveDao
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /** Local (login-independent) favorites and browsing history. */
 @Singleton
-class LocalStore @Inject constructor(db: AppDatabase) {
+class LocalStore @Inject constructor(
+    db: AppDatabase,
+    offlineArchiveDao: OfflineArchiveDao,
+) {
 
     private val favoriteDao = db.favoriteDao()
     private val historyDao = db.historyDao()
+    private val archiveDao = offlineArchiveDao
+
+    /** 离线归档条数（存储页统计）。 */
+    suspend fun archiveCount(): Int = archiveDao.count()
+
+    /** 离线归档占用字节（postJson 载荷之和，近似）。 */
+    suspend fun archiveBytes(): Long = archiveDao.getTotalBytes()
 
     fun favoritePaging(): PagingSource<Int, FavoritePostEntity> = favoriteDao.observeAll()
 
@@ -38,6 +49,10 @@ class LocalStore @Inject constructor(db: AppDatabase) {
     /** 观察某条帖子的本地收藏状态（列表卡片用）。 */
     fun observeFavorite(service: String, creatorId: String, postId: String): Flow<Boolean> =
         favoriteDao.isFavorite(service, creatorId, postId)
+
+    /** 同步读取某条帖子的本地收藏状态（单次查询，冷判定用）。 */
+    suspend fun isFavoriteOnce(service: String, creatorId: String, postId: String): Boolean =
+        favoriteDao.existsOnce(service, creatorId, postId)
 
     /** 直接移除本地收藏（云端取消收藏时同步清理本地副本）。 */
     suspend fun removeFavorite(service: String, creatorId: String, postId: String) =

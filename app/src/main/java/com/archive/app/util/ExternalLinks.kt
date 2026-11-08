@@ -19,6 +19,16 @@ object ExternalLinks {
         """(?is)<a\b[^>]*?href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*?>(.*?)</a>""",
     )
 
+    /** 从 https URL 里取 host：URI 构造对未编码字符（空格/中文）会抛异常，
+     *  兜底用正则从 scheme 后截取到第一个 /、?、# 之前。 */
+    private fun hostOf(href: String): String {
+        val viaUri = runCatching { java.net.URI(href).host }.getOrNull()
+        if (!viaUri.isNullOrBlank()) return viaUri
+        val rest = href.removePrefix("https://").removePrefix("HTTPS://")
+        return rest.substringBefore('/').substringBefore('?').substringBefore('#')
+            .substringBefore('@').lowercase()
+    }
+
     fun extract(html: String?): List<Link> {
         if (html.isNullOrBlank()) return emptyList()
         val seen = linkedSetOf<String>()
@@ -28,11 +38,14 @@ object ExternalLinks {
                 ?: match.groupValues[2].ifBlank { null }
                 ?: match.groupValues[3].ifBlank { null })?.trim().orEmpty()
             if (!href.startsWith("https://", ignoreCase = true)) return@forEach
-            val host = runCatching { java.net.URI(href).host.orEmpty() }.getOrDefault("")
+            val host = hostOf(href)
             if (host.isBlank()) return@forEach
-            if (host.lowercase() in FILE_HOSTS) return@forEach
-            // 站点自身域名的文件路径也不算外部链接
-            if (href.contains("/data/") && href.contains("pawchive.pw")) return@forEach
+            if (host in FILE_HOSTS) return@forEach
+            // 站点自身域名的文件路径也不算外部链接（按 host+path 精确判断，
+            // contains 会把 evil.com/?pawchive.pw/data/ 这类伪造串误伤）
+            if (host == "pawchive.pw" && href.removePrefix("https://").removePrefix("pawchive.pw")
+                    .substringBefore('?').substringBefore('#').contains("/data/")
+            ) return@forEach
             val key = href.trimEnd('/')
             if (!seen.add(key)) return@forEach
             val title = HtmlParser

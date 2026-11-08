@@ -58,9 +58,13 @@ class FavoriteActions @Inject constructor(
 
     /** 打开详情页时用完整正文补写本地收藏（卡片收藏时拿不到正文）。 */
     suspend fun ensureArchived(record: FavoriteRecord, fullPost: Post) {
+        // 单次查询真实判定收藏状态。此前写法是
+        // runCatching { observeFavorite(...) }.isSuccess——创建 Flow 对象永远成功、
+        // 且从未 collect，恒为 true，等于"只要打开详情页就把该帖写入离线归档"，
+        // 未收藏的帖子也会被 archive，无论收藏与否。
         val isFav = runCatching {
-            localStore.observeFavorite(record.service, record.creatorId, record.postId)
-        }.isSuccess
+            localStore.isFavoriteOnce(record.service, record.creatorId, record.postId)
+        }.getOrDefault(false)
         if (!isFav) return
         runCatching { bookmarkManager.bookmarkPost(fullPost) }
     }

@@ -8,7 +8,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -16,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.archive.app.ui.design.AppButton
 import com.archive.app.ui.design.AppIconButton
+import com.archive.app.ui.design.AppSpinner
 import com.archive.app.ui.theme.LocalPurrColors
 import kotlinx.coroutines.delay
 
@@ -55,11 +55,7 @@ fun MorphIconButton(
         when (st) {
             MorphState.IDLE -> AppIconButton(onClick = onAction, icon = icon, contentDescription = contentDescription, modifier = modifier)
             MorphState.LOADING -> Box(modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = colors.primary,
-                )
+                AppSpinner(size = 18.dp, color = colors.primary)
             }
             MorphState.SUCCESS -> Box(modifier.size(48.dp), contentAlignment = Alignment.Center) {
                 CheckMorphIcon(visible = true, tint = colors.primary)

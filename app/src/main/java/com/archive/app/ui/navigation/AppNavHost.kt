@@ -38,6 +38,10 @@ import com.archive.app.ui.screens.AccountScreen
 import com.archive.app.ui.screens.NotificationsScreen
 import com.archive.app.ui.screens.PostDetailScreen
 import com.archive.app.ui.screens.SettingsScreen
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 object Routes {
     const val LOGIN = "login"
@@ -74,6 +78,7 @@ object Routes {
 fun AppNavHost(navController: NavHostController) {
     val appViewModel: AppViewModel = hiltViewModel()
     val menuController = remember { AppMenuController() }
+    val context = androidx.compose.ui.platform.LocalContext.current
     CompositionLocalProvider(LocalAppMenuController provides menuController) {
         Box(Modifier.fillMaxSize()) {
             NavHost(
@@ -185,8 +190,29 @@ fun AppNavHost(navController: NavHostController) {
                     MenuItemSpec("全站搜索", LucideIcons.search) { navController.navigate(Routes.SEARCH) },
                     MenuItemSpec("浏览历史", LucideIcons.tasks) { navController.navigate(Routes.HISTORY) },
                     MenuItemSpec("下载管理", LucideIcons.downloads) { navController.navigate(Routes.DOWNLOADS) },
+                    // AI 功能设置：与「我 → 设置 → AI 功能 → 帖子翻译」同一个页面
+                    MenuItemSpec("AI 设置", LucideIcons.sparkles) { navController.navigate(Routes.TRANSLATION) },
+                    MenuItemSpec("一键清理缓存", LucideIcons.delete) { clearCache(context) },
                 ),
             )
+        }
+    }
+}
+
+/**
+ * 首页菜单的「一键清理缓存」：与设置页/Hilt 的清理走同一个 CacheRepository.clearCache，
+ * 只清 cacheDir 与 externalCacheDir（含 Coil 图片缓存），不碰下载文件。
+ * 清理可能删不少文件，放到 IO 线程做，完成后在主线程 Toast 反馈。
+ */
+private fun clearCache(context: android.content.Context) {
+    val appContext = context.applicationContext
+    CoroutineScope(Dispatchers.IO).launch {
+        val repository = dagger.hilt.android.EntryPointAccessors
+            .fromApplication(appContext, com.archive.app.ui.AppEntryPoint::class.java)
+            .cacheRepository()
+        runCatching { repository.clearCache() }
+        withContext(Dispatchers.Main) {
+            android.widget.Toast.makeText(appContext, "缓存已清理", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 }

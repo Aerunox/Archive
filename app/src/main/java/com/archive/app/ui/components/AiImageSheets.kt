@@ -19,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.archive.app.data.AiTurn
 import com.archive.app.ui.design.AppButton
+import com.archive.app.ui.design.AppSpinner
 import com.archive.app.ui.design.AppText
 import com.archive.app.ui.design.AppTextField
 import com.archive.app.ui.design.AppTextStyle
@@ -315,11 +315,7 @@ private fun LoadingRow(text: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(15.dp),
-            color = colors.primary,
-            strokeWidth = 2.dp,
-        )
+        AppSpinner(size = 15.dp, color = colors.primary)
         AppText(text, style = AppTextStyle.SMALL, color = colors.textSecondary)
     }
 }

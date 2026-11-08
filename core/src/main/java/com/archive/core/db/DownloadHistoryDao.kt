@@ -128,7 +128,9 @@ interface DownloadHistoryDao {
     @Query("SELECT * FROM download_records WHERE status = 'PENDING'")
     suspend fun getPending(): List<DownloadRecord>
 
-    /** 应用重启后将所有未完成（PENDING/RUNNING）任务标记为失败（单条批量 UPDATE）。 */
-    @Query("UPDATE download_records SET status = :failed, errorMessage = :message WHERE status IN ('PENDING', 'RUNNING')")
+    /** 应用重启后将 RUNNING 任务标记为失败（单条批量 UPDATE）。
+     *  只标 RUNNING：PENDING 记录留给 DownloadCenter.selfHealPending 重启——
+     *  若此处把 PENDING 一并标失败，自愈查询的 PENDING 集合永远为空，自愈失效。 */
+    @Query("UPDATE download_records SET status = :failed, errorMessage = :message WHERE status = 'RUNNING'")
     suspend fun markInterruptedAsFailed(failed: DownloadStatus, message: String)
 }

@@ -38,6 +38,9 @@ class CacheRepository @Inject constructor(
 
     private val imageDiskCacheDirName = "image_cache"
 
+    /** :app 侧 Coil3 ImageLoader 实际使用的图片磁盘缓存目录（ArchiveApp.newImageLoader）。 */
+    private val APP_IMAGE_CACHE_DIR = "archive_images"
+
     private companion object {
         const val TAG = "CacheRepository"
 
@@ -61,14 +64,21 @@ class CacheRepository @Inject constructor(
 
     // ========== 分类统计与清理（ARCH-FEATURE-004） ==========
 
-    /** 图片缓存大小（Coil image_cache 目录）。 */
-    fun getImageCacheSize(): Long = dirSize(File(context.cacheDir, imageDiskCacheDirName))
+    /**
+     * 图片缓存大小（图片磁盘缓存目录）。
+     * 图片实际缓存目录由 :app 的 Coil3 ImageLoader 决定——`archive_images`
+     * （见 ArchiveApp.newImageLoader）；`image_cache` 是早期 Coil2 的目录，
+     * 仅旧版本升级后可能残留，一并计入统计。
+     */
+    fun getImageCacheSize(): Long =
+        dirSize(File(context.cacheDir, APP_IMAGE_CACHE_DIR)) +
+            dirSize(File(context.cacheDir, imageDiskCacheDirName))
 
-    /** 其他缓存大小（cacheDir 不含 image_cache + externalCacheDir）。 */
+    /** 其他缓存大小（cacheDir 不含图片缓存目录 + externalCacheDir）。 */
     fun getOtherCacheSize(): Long =
         (getCacheSize() - getImageCacheSize()).coerceAtLeast(0L)
 
-    /** 清理图片缓存（Coil 内存 + 磁盘缓存；image_cache 目录本身保留）。 */
+    /** 清理图片缓存（Coil 内存 + 磁盘缓存；目录本身保留）。 */
     fun clearImageCache() {
         try {
             val loader = coil.Coil.imageLoader(context)
@@ -77,13 +87,21 @@ class CacheRepository @Inject constructor(
         } catch (e: Exception) {
             Log.w(TAG, "image cache clear failed", e)
         }
+        // :data 未依赖 Coil3，无法通过其 DiskCache API 清理 :app 侧的 archive_images，
+        // 直接删目录内容（保留目录本身，Coil3 会重建 journal）。
+        try {
+            File(context.cacheDir, APP_IMAGE_CACHE_DIR).listFiles()?.forEach { it.deleteRecursively() }
+        } catch (e: Exception) {
+            Log.w(TAG, "archive_images cleanup failed", e)
+        }
     }
 
-    /** 清理其他缓存（cacheDir 非 image_cache 内容 + externalCacheDir + API 内存缓存）。 */
+    /** 清理其他缓存（cacheDir 非图片缓存内容 + externalCacheDir + API 内存缓存）。 */
     fun clearOtherCache() {
+        val preserved = setOf(imageDiskCacheDirName, APP_IMAGE_CACHE_DIR)
         try {
             context.cacheDir.listFiles()?.forEach { file ->
-                if (file.name != imageDiskCacheDirName) {
+                if (file.name !in preserved) {
                     file.deleteRecursively()
                 }
             }
@@ -158,7 +176,14 @@ class CacheRepository @Inject constructor(
         settingsManager.getDownloadTreeUri()?.let { treeUri ->
             try {
                 DocumentFile.fromTreeUri(context, treeUri)?.let { tree ->
-                    tree.listFiles().forEach { file -> if (file.delete()) deleted++ }
+                    // 只删媒体文件、跳过子目录：该 tree 由用户在系统选择器里挑，可能选到
+                    // 相册根目录，无过滤会把用户无关文件一并删掉（MediaStore 分支有
+                    // RELATIVE_PATH LIKE '%Pawchive%' 过滤，此处按扩展名对齐）。
+                    tree.listFiles().forEach { file ->
+                        if (!file.isDirectory && file.name?.let { isDownloadableMediaName(it) } == true) {
+                            if (file.delete()) deleted++
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "delete SAF downloads failed", e)
@@ -173,6 +198,12 @@ class CacheRepository @Inject constructor(
         MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
         MediaStore.Video.Media.EXTERNAL_CONTENT_URI
     )
+
+    /** 按扩展名判断是否为本应用下载的媒体产物（与 DownloadType.IMAGE/VIDEO/ATTACHMENT 覆盖面一致）。 */
+    private fun isDownloadableMediaName(name: String): Boolean {
+        val ext = name.substringAfterLast('.', "").lowercase()
+        return ext in setOf("jpg", "jpeg", "png", "gif", "webp", "bmp", "avif", "mp4", "mkv", "webm", "mov", "zip", "pdf")
+    }
 
     private fun dirSize(dir: File?): Long {
         if (dir == null || !dir.exists()) return 0L

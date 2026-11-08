@@ -137,6 +137,7 @@
     <string name="history_local_only">仅保存在本机</string>
     <string name="pull_to_refresh_pull">下拉刷新</string>
     <string name="pull_to_refresh_release">松开刷新</string>
+    <string name="pull_to_refresh_refreshing">正在刷新…</string>
     <string name="pull_to_refresh_done">刷新完成</string>
     <string name="register_web_hint">站点注册需要人机验证，已在下方嵌入官方注册页。在网页里注册或登录成功后应用会自动登录；若未自动登录，可用「登录」标签登录。</string>
     <string name="register_web_open_browser">在浏览器中打开</string>
@@ -145,4 +146,18 @@
     <string name="open_browser_failed">无法打开浏览器，请手动访问：%1$s</string>
     <string name="action_retry">重试</string>
     <string name="mine_signed_in_title">已登录</string>
+
+    <!-- 设置页分类入口（对照参考图的「图标 + 标题 + 摘要 + 箭头」分类法）。
+         摘要不写死：由该分类下各设置项标题动态拼接，避免与设置项文案两套翻译不一致。 -->
+    <string name="settings_search_hint">搜索设置</string>
+    <string name="settings_no_results">没有匹配的设置项</string>
+    <string name="settings_back_to_list">返回设置分类</string>
+    <string name="settings_cat_appearance">外观</string>
+    <string name="settings_cat_privacy">隐私与安全</string>
+    <string name="settings_cat_network">网络</string>
+    <string name="settings_cat_browse">浏览与搜索</string>
+    <string name="settings_cat_download">下载</string>
+    <string name="settings_cat_storage">存储与清理</string>
+    <string name="settings_cat_ai">AI 功能</string>
+    <string name="settings_cat_blocked">内容屏蔽</string>
 </resources>

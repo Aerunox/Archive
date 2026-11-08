@@ -137,6 +137,7 @@
     <string name="history_local_only">Enregistré sur cet appareil uniquement</string>
     <string name="pull_to_refresh_pull">Tirez pour actualiser</string>
     <string name="pull_to_refresh_release">Relâchez pour actualiser</string>
+    <string name="pull_to_refresh_refreshing">Actualisation…</string>
     <string name="pull_to_refresh_done">Actualisation terminée</string>
     <string name="register_web_hint">L\'inscription requiert un captcha ; la page officielle est intégrée ci-dessous. Inscrivez-vous ou connectez-vous : l\'application se connecte automatiquement, sinon utilisez l\'onglet Connexion.</string>
     <string name="register_web_open_browser">Ouvrir dans le navigateur</string>

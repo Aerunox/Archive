@@ -86,21 +86,23 @@ internal fun parsePostTranslation(raw: String, fallbackTitle: String): PostTrans
         }
 
         // 修补：模型在字符串里直接换行 / 漏转义引号 → JSON 非法。
-        // 用正则把两个字段的值抠出来（html 一直取到最后一个引号，标题在 "html" 之前找）。
-        val repairedHtml = Regex("\"html\"\\s*:\\s*\"(.*)\"", RegexOption.DOT_MATCHES_ALL)
+        // 用正则把两个字段的值抠出来：值只匹配到未转义引号（贪婪 .* 会把
+        // html 字段之后的其它 JSON 字段整个吞进译文）；title/html 顺序无关，
+        // 各自在全文找第一个出现的位置。
+        val htmlValue = Regex("\"html\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"", RegexOption.DOT_MATCHES_ALL)
             .find(cleaned)
             ?.groupValues?.get(1)
             ?.let(::unescapeJsonString)
             ?.trim()
-        if (!repairedHtml.isNullOrBlank()) {
-            val repairedTitle = Regex("\"title\"\\s*:\\s*\"(.*?)\"", RegexOption.DOT_MATCHES_ALL)
-                .find(cleaned.substringBefore("\"html\""))
+        if (!htmlValue.isNullOrBlank()) {
+            val repairedTitle = Regex("\"title\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"", RegexOption.DOT_MATCHES_ALL)
+                .find(cleaned)
                 ?.groupValues?.get(1)
                 ?.let(::unescapeJsonString)
                 ?.trim()
             return PostTranslation(
                 title = repairedTitle?.takeIf { it.isNotBlank() } ?: fallbackTitle,
-                html = repairedHtml,
+                html = htmlValue,
             )
         }
     }

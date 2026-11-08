@@ -114,8 +114,10 @@ class HomeViewModel @Inject constructor(
     /** 云端收藏序号索引（「按收藏时间排序」用）。 */
     private val favedIndex: StateFlow<FavedSeqIndex> = favoriteSeqRepository.index
 
-    /** 已加载的帖子（按加载次序追加，刷新时清空）——排序的数据源。 */
-    private val loadedPosts = mutableListOf<PostSummary>()
+    /** 已加载的帖子（按加载次序追加，刷新时清空）——排序的数据源。
+     *  写方（Paging 的 map，可能在后台协程）与读方（combine 里排序遍历）并发，
+     *  普通 MutableList 会 ConcurrentModificationException / 读到中间态，用 COW 列表保证一致性。 */
+    private val loadedPosts = java.util.concurrent.CopyOnWriteArrayList<PostSummary>()
     private val loadedTick = MutableStateFlow(0)
 
     /** 首页信息流选项（Pawchive 对齐）：同作者仅显示一条 / 隐藏已收藏创作者。 */
@@ -156,8 +158,9 @@ class HomeViewModel @Inject constructor(
     private val query = MutableStateFlow("")
     val currentQuery: StateFlow<String> = query
 
-    /** 站内搜索的已加载结果（同样支持排序；相关度需要关键词，所以排序时带上 query）。 */
-    private val loadedSearch = mutableListOf<PostSummary>()
+    /** 站内搜索的已加载结果（同样支持排序；相关度需要关键词，所以排序时带上 query）。
+     *  同 loadedPosts：Paging 写与 combine 读并发，需 COW 列表。 */
+    private val loadedSearch = java.util.concurrent.CopyOnWriteArrayList<PostSummary>()
     private val searchTick = MutableStateFlow(0)
 
     val searchResults: Flow<PagingData<PostSummary>> = query

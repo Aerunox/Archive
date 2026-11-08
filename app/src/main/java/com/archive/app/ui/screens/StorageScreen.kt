@@ -46,6 +46,7 @@ class StorageViewModel @Inject constructor(
     private val cacheRepository: CacheRepository,
     private val settingsManager: SettingsManager,
     @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
+    private val localStore: com.archive.app.data.repo.LocalStore,
 ) : ViewModel() {
 
     data class State(
@@ -70,10 +71,15 @@ class StorageViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             val loaded = withContext(Dispatchers.IO) {
+                // 离线归档统计：此前 State() 构造漏赋值，archiveCount/archiveBytes 恒 0
+                val archiveCount = runCatching { localStore.archiveCount() }.getOrDefault(0)
+                val archiveBytes = runCatching { localStore.archiveBytes() }.getOrDefault(0L)
                 State(
                     imageCache = runCatching { cacheRepository.getImageCacheSize() }.getOrDefault(0),
                     otherCache = runCatching { cacheRepository.getOtherCacheSize() }.getOrDefault(0),
                     downloadFiles = runCatching { cacheRepository.getDownloadFilesSize() }.getOrDefault(0),
+                    archiveCount = archiveCount,
+                    archiveBytes = archiveBytes,
 
                     lastCleanTime = runCatching { cacheRepository.getLastCleanTime() }.getOrDefault(0),
                     autoClean = settingsManager.isAutoCleanCacheEnabled(),

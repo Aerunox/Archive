@@ -132,8 +132,17 @@ class PostRepository @Inject constructor(private val api: PawchiveApi) {
             .filterNot { it.service == service && it.id == creatorId }
             .distinctBy { it.service to it.id }
 
+    /**
+     * 评论列表。站点（实测 2026-11）对**没有评论的帖子**返回 404 `{"error":"Not found"}`
+     * （有评论才 200，OpenAPI 里只写了 200）——按 Kemono 语义把 404 当成空列表，
+     * 否则每篇无评论的帖子都会在评论区报「加载失败」。
+     */
     suspend fun comments(service: String, creatorId: String, postId: String): List<PostComment> =
-        api.comments(service, creatorId, postId).mapNotNull { it.toDomain() }
+        try {
+            api.comments(service, creatorId, postId).mapNotNull { it.toDomain() }
+        } catch (e: retrofit2.HttpException) {
+            if (e.code() == 404) emptyList() else throw e
+        }
 
     suspend fun accountFavorites(type: String): List<SessionFavorite> =
         api.accountFavorites(type).mapNotNull { it.toDomain() }
