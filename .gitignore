@@ -21,3 +21,12 @@ local.properties
 
 # 杂项（PowerShell 重定向残留等）
 /$null
+
+# 本机工具与工作产物（不入库）
+/.gradle-home/
+/.tmp-miuix/
+/.mimosa/
+/.dsh-file-attachment/
+/.dsh-meow/
+/clear/
+/reports/

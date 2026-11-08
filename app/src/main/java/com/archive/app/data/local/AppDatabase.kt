@@ -8,6 +8,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RoomDatabase
+import androidx.room.Transaction
 import androidx.room.Upsert
 
 @Entity(tableName = "creators", primaryKeys = ["service", "id"])
@@ -51,6 +52,31 @@ data class HistoryEntity(
 interface CreatorDao {
     @Upsert
     suspend fun upsertAll(items: List<CreatorEntity>)
+
+    /**
+     * 全量同步专用：**真正的整体替换**——先清空，再分批写回，整个过程在**同一个事务**里。
+     *
+     * 语义必须与名字一致：服务端这次返回的列表就是全量快照，本次没返回的作者说明已被
+     * 移除，必须从本地删掉。早先只做 upsert 时，被移除的作者会一直留在库里，发现页的
+     * 搜索和排序（直接查这张表）会继续显示他们。
+     *
+     * 放在一个事务里有两个作用：
+     * 1. 清空对读取方不可见——PagingSource 读到的是提交前的旧快照，不会看到空列表；
+     *    中途失败整体回滚，旧数据不会丢。
+     * 2. 只提交一次 → 只让 PagingSource 失效一次。若每批（5000 行）各提交一次，9 万+ 行
+     *    要提交约 20 次，发现页下拉刷新后会连续重建列表，明显卡顿。
+     *
+     * 注：清空后写入是新行，所以这里用 @Upsert 只是图省事（等价于纯 insert），不再是
+     * 「逐行 REPLACE」那种全表覆盖的写法。
+     */
+    @Transaction
+    suspend fun replaceAllInChunks(items: List<CreatorEntity>, chunkSize: Int = 5000) {
+        // 空列表直接返回：接口异常返回空数组时不能把本地 9 万行缓存清掉，
+        // 那样用户会从「有数据但可能过期」退化成「完全没有数据」。
+        if (items.isEmpty()) return
+        clear()
+        items.chunked(chunkSize).forEach { upsertAll(it) }
+    }
 
     @Query("DELETE FROM creators")
     suspend fun clear()

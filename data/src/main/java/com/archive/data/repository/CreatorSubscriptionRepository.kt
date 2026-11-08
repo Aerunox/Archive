@@ -238,7 +238,10 @@ class CreatorSubscriptionRepository @Inject constructor(
         val posts = fetchPosts(subscription.service, subscription.creatorId)
         val newestPostId = posts.firstOrNull()?.id
 
-        // 有基线时：最新在前，基线之后（直到遇到基线帖）均为新帖
+        // 有基线时：最新在前，基线之后（直到遇到基线帖）均为新帖。
+        // 边界：基线帖若已被挤出首页（长期未同步、新帖超过一页），takeWhile 会把
+        // 整页全当新帖误报；此时无法精确截断，退化为"整页可见的旧帖不再回溯"，
+        // 只在基线确实出现在本页内时才逐条截断。
         val baseline = subscription.lastPostId
         val newUpdates = mutableListOf<ContentUpdateEntity>()
         // 关闭提醒的作者不写更新行（基线照常推进，见方法末尾 —— 重新打开时不补推积压帖）

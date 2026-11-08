@@ -23,6 +23,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.archive.app.data.AppSettings
 import com.archive.app.data.SettingsRepository
@@ -74,6 +75,9 @@ interface AppEntryPoint {
 
     /** 更新检查：启动时的自动检查（是否真的检查、间隔、忽略哪个版本都由它自己判断）。 */
     fun updateChecker(): com.archive.data.github.UpdateChecker
+
+    /** 缓存清理：首页菜单的「一键清理缓存」直接用，不必再进设置页。 */
+    fun cacheRepository(): com.archive.data.repository.CacheRepository
 }
 
 @Composable
@@ -231,7 +235,43 @@ fun ArchiveRoot(appViewModel: AppViewModel = hiltViewModel()) {
         // 多选模式下按返回键＝退出多选，而不是退出页面
         androidx.activity.compose.BackHandler(enabled = selection.active) { selection.clear() }
 
+        // 退出二次确认：只在导航栈根（一级标签页）接管系统返回。
+        // 二级页面不接管，照常交给 NavHost 出栈，返回手势与箭头不受影响；
+        // 多选态由上面那条 BackHandler 优先处理（两条 enabled 互斥）。
+        val currentBackStackEntry by navController.currentBackStackEntryAsState()
+        val atAppRoot = currentBackStackEntry?.destination?.route ==
+            com.archive.app.ui.navigation.Routes.MAIN
+        val lastExitAttemptAt = remember { androidx.compose.runtime.mutableLongStateOf(0L) }
+        androidx.activity.compose.BackHandler(enabled = atAppRoot && !selection.active) {
+            val now = System.currentTimeMillis()
+            val activity = ActivityFinder().find(context)
+            if (lastExitAttemptAt.value != 0L && now - lastExitAttemptAt.value < 2_000) {
+                activity?.finish()
+            } else {
+                lastExitAttemptAt.value = now
+                android.widget.Toast.makeText(
+                    context,
+                    "再按一次退出应用",
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+
+        // RTL 兜底：本项目靠 attachBaseContext 换 locale，字符串方向会跟着语言变，
+        // 但整页 start/end 镜像是否随 View 传导到 Compose 并不总是可靠（时序微妙）。
+        // 这里按当前 configuration 的方向显式提供 LocalLayoutDirection：阿拉伯语等 RTL
+        // 语言时整页镜像，其余语言解析为 LTR、行为不变。
+        val appLayoutDirection =
+            if (androidx.compose.ui.platform.LocalConfiguration.current.layoutDirection ==
+                android.view.View.LAYOUT_DIRECTION_RTL
+            ) {
+                androidx.compose.ui.unit.LayoutDirection.Rtl
+            } else {
+                androidx.compose.ui.unit.LayoutDirection.Ltr
+            }
+
         androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalLayoutDirection provides appLayoutDirection,
             LocalLocalStore provides localStore,
             LocalFavoriteActions provides favoriteActions,
             LocalDisplayNames provides displayNames,

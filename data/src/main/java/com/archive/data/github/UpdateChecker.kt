@@ -153,8 +153,10 @@ class UpdateChecker @Inject constructor(
     suspend fun autoCheck(currentVersion: String): UpdateResult? {
         if (!settingsManager.isAutoCheckUpdateEnabled()) return null
         if (shouldSkipCheck()) return null
-        recordCheckTime()
         val result = check(currentVersion)
+        // 检查失败（断网/超时/5xx）不推进时间戳：否则一次失败会锁死整个间隔期，
+        // "每天"频率下当天再也不自动检查。只有拿到真实结论（含"已是最新"）才算检查过。
+        if (result != UpdateResult.Error) recordCheckTime()
         _lastAutoResult.value = result
         if (result is UpdateResult.UpdateAvailable && result.latestVersion == ignoredVersion) return null
         return result
@@ -239,8 +241,37 @@ class UpdateChecker @Inject constructor(
             av.preRelease.isNullOrEmpty() && bv.preRelease.isNullOrEmpty() -> 0
             av.preRelease.isNullOrEmpty() -> 1   // a 为正式版，b 为预发布 → a 更新
             bv.preRelease.isNullOrEmpty() -> -1  // a 为预发布，b 为正式版 → b 更新
-            else -> av.preRelease.compareTo(bv.preRelease)
+            else -> comparePreRelease(av.preRelease, bv.preRelease)
         }
+    }
+
+    /**
+     * 预发布后缀逐段比较（semver 规则）：
+     * - 按 `.` 切段；纯数字段按数值比较，字母段按字典序，数字段 < 字母段；
+     * - 前段全等时段数多者更新（"1.2.0-rc.1" > "1.2.0-rc"）。
+     * 字典序直比会把 "beta.10" 判成小于 "beta.9"、"rc" 判成大于 "beta"，均错。
+     */
+    private fun comparePreRelease(a: String, b: String): Int {
+        val asg = a.split('.')
+        val bsg = b.split('.')
+        val n = maxOf(asg.size, bsg.size)
+        for (i in 0 until n) {
+            val x = asg.getOrNull(i)
+            val y = bsg.getOrNull(i)
+            if (x == y) continue
+            // 段数少的一方为空 → 少者更旧
+            if (x == null) return -1
+            if (y == null) return 1
+            val xn = x.toIntOrNull()
+            val yn = y.toIntOrNull()
+            return when {
+                xn != null && yn != null -> xn.compareTo(yn)      // 数字段按数值
+                xn != null -> -1                                   // 数字段 < 字母段
+                yn != null -> 1
+                else -> x.compareTo(y)                             // 字母段按字典序
+            }
+        }
+        return 0
     }
 
     private data class Semver(val numeric: List<Int>, val preRelease: String?)

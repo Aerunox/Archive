@@ -137,6 +137,7 @@
     <string name="history_local_only">僅儲存在本機</string>
     <string name="pull_to_refresh_pull">下拉重新整理</string>
     <string name="pull_to_refresh_release">鬆手重新整理</string>
+    <string name="pull_to_refresh_refreshing">正在重新整理…</string>
     <string name="pull_to_refresh_done">重新整理完成</string>
     <string name="register_web_hint">站點註冊需要人機驗證，已在下方嵌入官方註冊頁。在網頁裡註冊或登入成功後應用程式會自動登入；若未自動登入，可用「登入」分頁登入。</string>
     <string name="register_web_open_browser">在瀏覽器中開啟</string>

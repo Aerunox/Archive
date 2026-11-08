@@ -19,6 +19,7 @@ import android.webkit.WebResourceRequest
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -151,11 +152,27 @@ object CloudflareManager {
         val now = System.currentTimeMillis()
         cachedSavedAt = now
         try {
-            prefs?.edit()
-                ?.putString(KEY_COOKIE, clean)
-                ?.putString(KEY_USER_AGENT, userAgent)
-                ?.putLong(KEY_SAVED_AT, now)
-                ?.apply()
+            // prefs 可能在 loadPersisted 阶段因 Keystore 异常创建失败（保持 null）；
+            // 此时静默 no-op 会让凭据永不落盘，每次冷启动都重过盾且无任何线索——
+            // 在此懒重建一次，仍失败才降级为仅内存。
+            val sp = prefs ?: run {
+                val ctx = appContext ?: return
+                val masterKey = MasterKey.Builder(ctx)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                EncryptedSharedPreferences.create(
+                    ctx,
+                    PREFS_NAME,
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                ).also { prefs = it }
+            }
+            sp.edit()
+                .putString(KEY_COOKIE, clean)
+                .putString(KEY_USER_AGENT, userAgent)
+                .putLong(KEY_SAVED_AT, now)
+                .apply()
         } catch (e: Exception) {
             // ARCH-008：凭据持久化失败会导致下次冷启动重新过盾，记录日志
             Log.w("CloudflareManager", "persist clearance failed", e)
@@ -245,7 +262,15 @@ object CloudflareManager {
         if (BuildConfig.DEBUG && !hasClearance()) {
             Log.d("CloudflareManager", "ensureClearance: no valid memory clearance, awaiting WebView challenge")
         }
-        return runCatching { deferred.await() }.getOrDefault(false)
+        // 取消必须继续传播：runCatching 会吞掉 CancellationException，调用方 job
+        // 已取消时仍返回 false 继续执行错误分支，破坏结构化并发。
+        return try {
+            deferred.await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            false
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -457,6 +482,15 @@ object CloudflareManager {
      * 应在 Application 销毁/低内存时调用。
      */
     fun shutdown() {
+        // 先完成未决的过盾任务再取消作用域：cfScope.launch 被取消后不会执行
+        // deferred.complete(ok)，若不同步 complete(false)，正在 await 的调用方
+        // （本类自己的 catch 只处理 Throwable，CancellationException 会重抛——但
+        // 挂在 deferred.await() 上的是调用方协程，不会随 cfScope 取消而醒来）
+        // 将永久挂起。
+        synchronized(flightLock) {
+            inFlight?.complete(false)
+            inFlight = null
+        }
         cfScope.coroutineContext.cancel()
     }
 

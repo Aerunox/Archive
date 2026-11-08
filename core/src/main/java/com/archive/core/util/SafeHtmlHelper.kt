@@ -94,7 +94,15 @@ object SafeHtmlHelper {
             val text = innerHtml.replace(Regex("<[^>]+>"), "").trim()
 
             if (href.isNotEmpty() && text.isNotEmpty()) {
-                """<a href="$href">$text</a>"""
+                // 重建前必须转义：href 里的 `"` 会提前闭合我们拼出的 href 属性，
+                // text 里的 `<`/`&` 会被 fromHtml 再次解析成新标签/实体——
+                // 白名单"其余标签渲染前被转义"的防护就被绕过了。
+                val safeHref = href.replace("&", "&amp;").replace("\"", "&quot;")
+                val safeText = text
+                    .replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                """<a href="$safeHref">$safeText</a>"""
             } else if (text.isNotEmpty()) {
                 text
             } else {

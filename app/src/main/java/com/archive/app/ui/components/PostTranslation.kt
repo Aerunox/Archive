@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,7 +24,7 @@ import com.archive.app.data.TranslationClient
 import com.archive.app.data.forPurpose
 import com.archive.app.data.TranslationSettings
 import com.archive.app.data.TranslationSettingsRepository
-import com.archive.app.ui.design.AppButton
+import com.archive.app.ui.design.AppSpinner
 import com.archive.app.ui.design.AppText
 import com.archive.app.ui.design.AppTextStyle
 import com.archive.app.ui.design.lucide.LucideIcons
@@ -128,10 +127,37 @@ val LocalOpenTranslationSettings =
     androidx.compose.runtime.staticCompositionLocalOf<(() -> Unit)?> { null }
 
 /**
- * 帖子正文下方的翻译控件（对照参考图的「显示翻译 + 齿轮」）。
+ * 粗略的源语言猜测：只按文字体系判断，给「翻译自 XX」这行提示用，够准就够了。
+ * 有假名算日语、有谚文算韩语、有西里尔算俄语、有汉字算中文，其余（拉丁字母）按英语。
+ */
+internal fun guessSourceLanguage(text: String): String {
+    var kana = false
+    var hangul = false
+    var cyrillic = false
+    var han = false
+    for (c in text) {
+        when (c) {
+            in '\u3040'..'\u30FF' -> kana = true // 平假名 / 片假名
+            in '\uAC00'..'\uD7AF' -> hangul = true // 谚文音节
+            in '\u0400'..'\u04FF' -> cyrillic = true // 西里尔字母
+            in '\u3400'..'\u9FFF' -> han = true // 汉字（含扩展 A）
+        }
+    }
+    return when {
+        kana -> "日语"
+        hangul -> "韩语"
+        cyrillic -> "俄语"
+        han -> "中文"
+        else -> "英语"
+    }
+}
+
+/**
+ * 帖子正文上方的翻译横幅（对照 X 译帖的「文A 翻译自英语 显示原文 ⚙」）。
  *
- * 这里只放控件：译文由正文与标题**原地替换**渲染（见 PostDetailScreen），
+ * 这里只放横幅：译文由正文与标题**原地替换**渲染（见 PostDetailScreen），
  * 所以段落结构与原文完全对齐，不会额外多出一段排版不一致的文字。
+ * 蓝色链接是开关：翻译前「显示翻译」，翻译完切「显示原文」；齿轮进翻译设置。
  */
 @Composable
 fun PostTranslationSection(
@@ -158,64 +184,60 @@ fun PostTranslationSection(
     Column(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            AppButton(
-                text = when {
+            Icon(
+                imageVector = LucideIcons.languages,
+                contentDescription = null,
+                tint = colors.textTertiary,
+                modifier = Modifier.size(16.dp),
+            )
+            AppText(
+                "翻译自" + guessSourceLanguage(title + contentHtml),
+                style = AppTextStyle.SECONDARY,
+                color = colors.textTertiary,
+            )
+            if (loading) {
+                AppSpinner(size = 12.dp, color = colors.primary)
+            }
+            AppText(
+                when {
                     translatedHtml != null -> "显示原文"
                     loading -> "翻译中…"
                     else -> "显示翻译"
                 },
-                onClick = {
-                    if (translatedHtml != null) {
-                        viewModel.showOriginal()
-                    } else {
-                        viewModel.translate(title, contentHtml)
+                style = AppTextStyle.SECONDARY,
+                color = colors.primary,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable(enabled = !loading) {
+                        if (translatedHtml != null) {
+                            viewModel.showOriginal()
+                        } else {
+                            viewModel.translate(title, contentHtml)
+                        }
                     }
-                },
-                primary = false,
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
             )
-            // 齿轮：直接进「帖子翻译」设置（对照参考图右上角的设置图标）
+            // 齿轮：直接进「帖子翻译」设置（对照参考图链接右侧的设置图标）
             (onOpenSettings ?: LocalOpenTranslationSettings.current)?.let { open ->
                 Box(
                     Modifier
                         .clip(CircleShape)
                         .clickable(onClick = open)
-                        .padding(8.dp),
+                        .padding(6.dp),
                 ) {
                     Icon(
                         imageVector = LucideIcons.settings,
                         contentDescription = "翻译设置",
                         tint = colors.textTertiary,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(16.dp),
                     )
                 }
-            }
-            if (!settings.configured) {
-                AppText(
-                    "未配置：我 → 设置 → 帖子翻译",
-                    style = AppTextStyle.SMALL,
-                    color = colors.textTertiary,
-                )
-            }
-        }
-
-        if (loading) {
-            Row(
-                Modifier.padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
-                    color = colors.primary,
-                    strokeWidth = 2.dp,
-                )
-                AppText("正在逐句翻译并保持原排版…", style = AppTextStyle.SMALL, color = colors.textSecondary)
             }
         }
 
@@ -224,7 +246,7 @@ fun PostTranslationSection(
                 it,
                 style = AppTextStyle.SMALL,
                 color = colors.error,
-                modifier = Modifier.padding(top = 6.dp),
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
     }

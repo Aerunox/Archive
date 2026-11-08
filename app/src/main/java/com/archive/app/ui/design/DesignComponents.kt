@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
 
 /**
  * Theme-neutral component surface. Screens depend only on these; the concrete
@@ -185,6 +186,11 @@ interface DesignComponents {
         isRefreshing: Boolean,
         onRefresh: () -> Unit,
         modifier: Modifier = Modifier,
+        /**
+         * 仅顶部值生效：把刷新指示器从容器顶部往下偏移。容器全屏铺底、顶栏盖在
+         * 内容上面时（如发现页），传 scaffold 的 top padding 让指示器露在顶栏下方。
+         */
+        contentPadding: PaddingValues = PaddingValues(0.dp),
         content: @Composable () -> Unit,
     )
 

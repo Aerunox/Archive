@@ -30,7 +30,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -90,6 +89,7 @@ import com.archive.app.ui.components.viewerMedia
 import com.archive.app.ui.design.AppDivider
 import com.archive.app.ui.design.AppLoading
 import com.archive.app.ui.design.AppSmallTitle
+import com.archive.app.ui.design.AppSpinner
 import com.archive.app.ui.design.lucide.LucideIcons
 import com.archive.app.ui.theme.LocalPurrColors
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -835,10 +835,10 @@ private fun OriginalPill(
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
             if (state.loading && !state.probed) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(13.dp),
-                    color = Color.White,
+                AppSpinner(
+                    size = 13.dp,
                     strokeWidth = 1.5.dp,
+                    color = Color.White,
                 )
             }
             Text(

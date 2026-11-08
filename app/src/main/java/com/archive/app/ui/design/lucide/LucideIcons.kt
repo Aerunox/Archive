@@ -355,6 +355,87 @@ object LucideIcons {
             ),
         ).also { _ellipsis = it }
 
+    private var _palette: ImageVector? = null
+    val palette: ImageVector
+        get() = _palette ?: stroke(
+            name = "palette",
+            paths = listOf(
+            "M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z",
+            "M 13,6.5 a 0.5,0.5 0 1,0 1,0 a 0.5,0.5 0 1,0 -1,0",
+            "M 17,10.5 a 0.5,0.5 0 1,0 1,0 a 0.5,0.5 0 1,0 -1,0",
+            "M 6,12.5 a 0.5,0.5 0 1,0 1,0 a 0.5,0.5 0 1,0 -1,0",
+            "M 8,7.5 a 0.5,0.5 0 1,0 1,0 a 0.5,0.5 0 1,0 -1,0",
+            ),
+        ).also { _palette = it }
+
+    private var _shield: ImageVector? = null
+    val shield: ImageVector
+        get() = _shield ?: stroke(
+            name = "shield",
+            paths = listOf(
+            "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z",
+            ),
+        ).also { _shield = it }
+
+    private var _globe: ImageVector? = null
+    val globe: ImageVector
+        get() = _globe ?: stroke(
+            name = "globe",
+            paths = listOf(
+            "M 2,12 a 10,10 0 1,0 20,0 a 10,10 0 1,0 -20,0",
+            "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20",
+            "M2 12h20",
+            ),
+        ).also { _globe = it }
+
+    private var _sparkles: ImageVector? = null
+    val sparkles: ImageVector
+        get() = _sparkles ?: stroke(
+            name = "sparkles",
+            paths = listOf(
+            "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z",
+            "M20 2v4",
+            "M22 4h-4",
+            "M 2,20 a 2,2 0 1,0 4,0 a 2,2 0 1,0 -4,0",
+            ),
+        ).also { _sparkles = it }
+
+    private var _languages: ImageVector? = null
+    val languages: ImageVector
+        get() = _languages ?: stroke(
+            name = "languages",
+            paths = listOf(
+            "m5 8 6 6",
+            "m4 14 6-6 2-3",
+            "M2 5h12",
+            "M7 2h1",
+            "m22 22-5-10-5 10",
+            "M14 18h6",
+            ),
+        ).also { _languages = it }
+
+    private var _ban: ImageVector? = null
+    val ban: ImageVector
+        get() = _ban ?: stroke(
+            name = "ban",
+            paths = listOf(
+            "M 2,12 a 10,10 0 1,0 20,0 a 10,10 0 1,0 -20,0",
+            "M4.929 4.929 19.07 19.071",
+            ),
+        ).also { _ban = it }
+
+    private var _hardDrive: ImageVector? = null
+    val hardDrive: ImageVector
+        get() = _hardDrive ?: stroke(
+            name = "hard-drive",
+            paths = listOf(
+            "M10 16h.01",
+            "M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z",
+            "M21.946 12.013H2.054",
+            "M6 16h.01",
+            ),
+        ).also { _hardDrive = it }
+
     private var _favoritesFill: ImageVector? = null
     val favoritesFill: ImageVector
         get() = _favoritesFill ?: stroke(

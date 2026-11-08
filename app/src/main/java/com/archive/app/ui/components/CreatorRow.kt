@@ -23,6 +23,8 @@ import com.archive.app.ui.theme.LocalPurrColors
  *
  * @param chevronRotation 传入角度即可让箭头旋转（发现页展开态用），null 表示静态箭头。
  * @param end 额外的行尾内容（显示在箭头之前）。
+ * @param trailingLabel 非 null 时用它替代右侧箭头，渲染成主题色文字按钮（如「查看」）——
+ *   适用于行点击是「跳转查看」语义的场景，避免「展开」箭头造成误导。
  */
 @Composable
 fun CreatorRow(
@@ -35,6 +37,7 @@ fun CreatorRow(
     updatedText: String? = null,
     extraSuffix: String? = null,
     chevronRotation: Float? = null,
+    trailingLabel: String? = null,
     end: (@Composable RowScope.() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
@@ -61,14 +64,26 @@ fun CreatorRow(
         },
         end = {
             end?.invoke(this)
-            Icon(
-                imageVector = LucideIcons.expander,
-                contentDescription = null,
-                tint = colors.textSecondary,
-                modifier = Modifier
-                    .padding(start = if (end != null) 4.dp else 0.dp)
-                    .graphicsLayer { rotationZ = chevronRotation ?: 0f },
-            )
+            if (trailingLabel != null) {
+                // 行尾按钮走 Miuix 的 TextButton（AppButton 的 Miuix 实现）：
+                // 与行点击同动作，视觉上是一个明确的「查看」按钮。
+                com.archive.app.ui.design.AppButton(
+                    text = trailingLabel,
+                    onClick = { onClick?.invoke() },
+                    primary = false,
+                    modifier = Modifier
+                        .padding(start = if (end != null) 4.dp else 0.dp),
+                )
+            } else {
+                Icon(
+                    imageVector = LucideIcons.expander,
+                    contentDescription = null,
+                    tint = colors.textSecondary,
+                    modifier = Modifier
+                        .padding(start = if (end != null) 4.dp else 0.dp)
+                        .graphicsLayer { rotationZ = chevronRotation ?: 0f },
+                )
+            }
         },
         onClick = onClick,
     )

@@ -94,12 +94,14 @@ class FavedSeqIndex(private val seqByKey: Map<String, Int>) {
         fun keyOf(service: String, creatorId: String, postId: String): String =
             "$service/$creatorId/$postId"
 
-        /** [favorites] 是账号收藏接口按顺序返回的结果；个别条目缺 faved_seq 时用返回次序兜底。 */
+        /** [favorites] 是账号收藏接口按顺序返回的结果；缺 faved_seq 的条目不写序号：
+         *  兜底值 favorites.size-index 与真实 faved_seq 数值域重叠，会把缺序号的
+         *  条目混进真序号排序中间；不写则走 sortedByFavedSeq 的"null 排最后"分支。 */
         fun from(favorites: List<FavoritePost>): FavedSeqIndex {
             if (favorites.isEmpty()) return EMPTY
             val map = HashMap<String, Int>(favorites.size)
             favorites.forEachIndexed { index, post ->
-                map[keyOf(post.service, post.user, post.id)] = post.favedSeq ?: (favorites.size - index)
+                post.favedSeq?.let { map[keyOf(post.service, post.user, post.id)] = it }
             }
             return FavedSeqIndex(map)
         }

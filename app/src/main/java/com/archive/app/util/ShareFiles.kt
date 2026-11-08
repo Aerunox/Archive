@@ -26,7 +26,14 @@ object ShareFiles {
     private fun fetch(url: String): ByteArray? = runCatching {
         ApiClient.sharedOkHttpClient.newCall(Request.Builder().url(url).build())
             .execute()
-            .use { response -> if (response.isSuccessful) response.body.bytes() else null }
+            .use { response ->
+                if (!response.isSuccessful) return@use null
+                // 分享只是把图写临时目录，超大原图全量读内存只会 OOM 后报"分享失败"；
+                // Content-Length 预检超限直接失败
+                val len = response.body.contentLength()
+                if (len > MAX_SHARE_BYTES) return@use null
+                response.body.bytes()
+            }
     }.getOrNull()
 
     /** 文件名尽量沿用附件原名（分享出去对方看到的就是它），兜底用 URL 末段。 */
@@ -34,6 +41,13 @@ object ShareFiles {
         val raw = title?.takeIf { it.isNotBlank() }
             ?: url.substringAfterLast('/').substringBefore('?')
         val cleaned = raw.replace(Regex("[^A-Za-z0-9._\\-\\u4e00-\\u9fff]"), "_").take(60)
-        return if (cleaned.contains('.')) cleaned else "$cleaned.jpg"
+        // cleaned 可能为空串（title 与 URL 末段同时为空/全非法），".jpg" 是隐藏文件
+        return when {
+            cleaned.contains('.') -> cleaned
+            cleaned.isEmpty() -> "share_${System.currentTimeMillis()}.jpg"
+            else -> "$cleaned.jpg"
+        }
     }
+
+    private const val MAX_SHARE_BYTES = 64L * 1024 * 1024
 }

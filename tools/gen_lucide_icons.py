@@ -41,6 +41,15 @@ ICONS = {
     # 图片查看器（对照微信看图界面：分享/转发、更多）
     "forward": "forward",
     "ellipsis": "ellipsis",
+    # 设置页分类入口（对照参考图的「图标 + 标题 + 摘要 + 箭头」分类法）
+    "palette": "palette",
+    "shield": "shield",
+    "globe": "globe",
+    "sparkles": "sparkles",
+    # 帖子详情的翻译横幅（对照 X 译帖的「文A 翻译自英语 显示原文」）
+    "languages": "languages",
+    "ban": "ban",
+    "hardDrive": "hard-drive",
 }
 
 CACHE = "/tmp/lucide_svg"

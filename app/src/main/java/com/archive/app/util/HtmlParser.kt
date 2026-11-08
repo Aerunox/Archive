@@ -68,7 +68,9 @@ object HtmlParser {
             i = gt + 1
             val lower = tag.lowercase()
             when {
-                lower.startsWith("img") -> {
+                // 精确匹配标签名：startsWith("img")/("a") 会把 abbr/area/article/aside
+                // 等合法标签也误判成 <a>/<img>，带 href 的自造标签会误开链接状态
+                lower == "img" || lower.startsWith("img ") || lower.startsWith("img/") -> {
                     flushText()
                     attrOf(tag, "src")?.let { nodes += HtmlNode.Image(it) }
                 }
@@ -81,7 +83,7 @@ object HtmlParser {
                 lower == "/i" || lower == "/em" -> { flushText(); italic = false }
                 lower == "u" -> { flushText(); underline = true }
                 lower == "/u" -> { flushText(); underline = false }
-                lower.startsWith("a") && !lower.startsWith("/a") -> { flushText(); link = attrOf(tag, "href") }
+                lower == "a" || lower.startsWith("a ") -> { flushText(); link = attrOf(tag, "href") }
                 lower == "/a" -> { flushText(); link = null }
                 else -> Unit // unknown tags are dropped
             }
@@ -97,13 +99,15 @@ object HtmlParser {
     }
 
     fun decodeEntities(text: String): String {
+        // &amp; 必须最后解码：先解 &amp; 会把源文本里的 "&amp;lt;" 二次解码成 "<"，
+        // 显示内容被篡改（&lt;/&gt; 等先解码后，遗留的 & 序列已不可能再组成这些实体名）。
         var out = text
             .replace("&nbsp;", " ")
-            .replace("&amp;", "&")
             .replace("&lt;", "<")
             .replace("&gt;", ">")
             .replace("&quot;", "\"")
             .replace("&apos;", "'")
+            .replace("&amp;", "&")
         // numeric character references (&#39; / &#x27; …) appear in real post bodies
         out = NUMERIC_ENTITY.replace(out) { match ->
             val value = if (match.groupValues[1].isNotEmpty()) {

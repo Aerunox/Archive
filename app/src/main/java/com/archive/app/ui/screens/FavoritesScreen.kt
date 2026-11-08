@@ -144,22 +144,36 @@ class FavoritesViewModel @Inject constructor(
 
     fun refreshAll() {
         loggedIn.value = authRepository.isLoggedIn()
-        username.value = authRepository.getUsername()
-        if (!loggedIn.value) {
+        val newUser = authRepository.getUsername()
+        // 只有换了账号（或退出登录）才清空：上一个账号的收藏不能在刷新期间继续展示。
+        // 同一账号重进页面保留已加载内容，后台刷新的进行状态由下拉指示器承载
+        // （内置组件的 refresh-on-entry 设计，与发现页一致）。
+        val accountChanged = newUser != username.value
+        username.value = newUser
+        if (!loggedIn.value || accountChanged) {
             posts.value = ListState()
             creators.value = ListState()
-            return
         }
+        if (!loggedIn.value) return
         loadPosts(reset = true)
         loadCreators()
     }
 
+    /** 请求代际号：reset 会清空列表，在途的 loadMore 回调晚于 reset 时
+     *  若不校验，旧页数据会被 append 进刷新后的空列表；整页重复时还会把
+     *  endReached 误判为 true 提前终止分页。回调时校验代际即可挡掉。 */
+    private var requestGen = 0
+
     fun loadPosts(reset: Boolean) {
         val current = posts.value
         if (!reset && (current.loading || current.loadingMore || current.endReached)) return
-        // 状态同步置位：自动续页与手动点击可能落在同一帧，靠它把重复请求挡掉
+        val gen = ++requestGen
+        // 状态同步置位：自动续页与手动点击可能落在同一帧，靠它把重复请求挡掉。
+        // reset **不清空已加载的列表**：下拉刷新时内容保持可见，刷新状态由
+        // AppPullToRefresh 的内置指示器承载（与首页/发现页一致）；整屏加载占位
+        // 只由 Tab 里「loading 且无内容」的分支负责（真·首次加载）。
         posts.value = if (reset) {
-            current.copy(loading = true, error = null, items = emptyList(), endReached = false)
+            current.copy(loading = true, error = null, endReached = false)
         } else {
             current.copy(loadingMore = true, error = null)
         }
@@ -168,6 +182,8 @@ class FavoritesViewModel @Inject constructor(
                 offset = if (reset) null else current.items.size,
                 forceRefresh = reset,
             ).onSuccess { page ->
+                // 已被更新的请求取代（如 loadMore 在途时来了 reset），丢弃本次结果
+                if (gen != requestGen) return@onSuccess
                 val existing = posts.value.items
                 // 站点按 offset 分页时会返回重复条目（同一帖两条 faved_seq），
                 // 而 LazyColumn 的 key 重复会直接抛异常 —— 这里按「服务/作者/帖」去重
@@ -182,6 +198,7 @@ class FavoritesViewModel @Inject constructor(
                     error = null,
                 )
             }.onFailure { error ->
+                if (gen != requestGen) return@onFailure
                 posts.value = posts.value.copy(
                     loading = false,
                     loadingMore = false,
@@ -202,7 +219,12 @@ class FavoritesViewModel @Inject constructor(
                     creators.value = ListState(items = sortCreators(list, creatorSortMode.value))
                 }
                 .onFailure { error ->
-                    creators.value = ListState(error = error.message ?: "加载收藏作者失败")
+                    // 失败**不清空已有列表**（错误行内联在列表末尾展示）：
+                    // 下拉重试时内容保持可见，与 posts 的失败路径一致
+                    creators.value = creators.value.copy(
+                        loading = false,
+                        error = error.message ?: "加载收藏作者失败",
+                    )
                 }
         }
     }
@@ -450,7 +472,9 @@ private fun PostsTab(
         if (atLoadedEnd && !state.loadingMore && !state.endReached && state.error == null) onLoadMore()
     }
     when {
-        state.loading -> AppLoading()
+        // 整屏加载占位只用于真·首次加载（无内容可显示）；下拉刷新/重进页面时
+        // 列表保持可见，刷新状态由 AppPullToRefresh 的内置指示器承载
+        state.loading && state.items.isEmpty() -> AppLoading()
         state.error != null && state.items.isEmpty() -> PullableState {
             AppErrorState(
                 message = "加载失败：${state.error}",
@@ -520,7 +544,8 @@ private fun CreatorsTab(
     onRetry: () -> Unit,
 ) {
     when {
-        state.loading -> AppLoading()
+        // 与 PostsTab 同一套约定：整屏占位仅限「loading 且无内容」
+        state.loading && state.items.isEmpty() -> AppLoading()
         state.error != null && state.items.isEmpty() -> PullableState {
             AppErrorState(
                 message = "加载失败：${state.error}",

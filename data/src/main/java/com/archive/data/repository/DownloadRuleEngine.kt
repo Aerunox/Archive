@@ -97,6 +97,9 @@ class DownloadRuleEngine @Inject constructor(
             if (!matched) continue
 
             val url = buildFileUrl(path)
+            // path 缺失（数据残缺帖：只有 name 没有 path）时 URL 为空串，入队后
+            // Request.Builder().url("") 必抛异常，只会留下一条晦涩的失败记录——直接跳过。
+            if (url.isBlank()) continue
             // preview_only：站点仅收录预览、原图未导入，直接下载必 404（FEAT-PREVIEW-ONLY-SKIP）。
             // 跳过下载、落一条带原因的记录，站点补齐后在下载中心重试即可。
             if (previewOnly == true) {
