@@ -40,7 +40,6 @@ import com.archive.app.ui.design.AppTextStyle
 import com.archive.app.ui.design.AppTopBar
 import com.archive.app.ui.design.AppScaffold
 import com.archive.app.ui.design.appListModifier
-import com.archive.app.ui.design.rememberAppScrollBehavior
 import com.archive.app.ui.navigation.Routes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -78,7 +77,9 @@ fun HistoryScreen(
     val selectionScoped = isPostSelectionActive()
 
     AppScaffold(
-        topScrollBehavior = rememberAppScrollBehavior(),
+        // 不接可折叠大标题：顶栏是单行的（返回箭头与标题同行）。折叠栏会让顶栏高度
+        // 随滚动变化、contentPadding 跟着变，LazyColumn 因此反复重新测量，滚动位置
+        // 被打回顶部（表现为「滚不动」）。
         topBar = {
             AppTopBar(
                 title = androidx.compose.ui.res.stringResource(com.archive.app.R.string.mine_history),

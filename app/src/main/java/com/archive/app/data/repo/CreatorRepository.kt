@@ -19,9 +19,23 @@ class CreatorRepository @Inject constructor(
 ) {
     private val dao = db.creatorDao()
 
+    /**
+     * 全量拉取作者列表并**整体替换**本地库（服务端已移除的作者会一起删掉），返回拉到的行数。
+     *
+     * 9 万+ 行的 map 与入库全部放到 IO 线程：调用方是 viewModelScope（主线程调度器），
+     * 不切走的话这一整段会占住主线程，界面在刷新期间完全没响应。
+     *
+     * 注意：这个接口一次返回约 15MB / 9 万多行全量数据，服务端不分页、也拿不到增量，
+     * 所以刷新的耗时基本由网络决定（实测同一接口 11s / 59s / 109s 都出现过）。
+     * 代码侧能做的只有「单事务写入避免列表反复重建」和「失败可重试」，救不了网络。
+     */
     suspend fun refresh(): Int {
-        val entities = api.creators().map { it.toEntity() }
-        entities.chunked(5000).forEach { dao.upsertAll(it) }
+        val entities = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            api.creators().map { it.toEntity() }
+        }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            dao.replaceAllInChunks(entities)
+        }
         return entities.size
     }
 

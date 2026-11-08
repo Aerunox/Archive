@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -146,7 +147,13 @@ object MiuixDesign : DesignComponents {
         val navigationIcon: @Composable () -> Unit = {
             if (onBack != null) {
                 MiuixIconButton(onClick = { onBack() }) {
-                    Icon(imageVector = LucideIcons.back, contentDescription = "返回")
+                    // Miuix 的 LocalContentColor 默认硬编码 Black 且应用全程不覆盖，
+                    // 省略 tint 的 Icon 在深色顶栏上不可见，故显式取 textPrimary（跟随深浅色）。
+                    Icon(
+                        imageVector = LucideIcons.back,
+                        contentDescription = "返回",
+                        tint = com.archive.app.ui.theme.LocalPurrColors.current.textPrimary,
+                    )
                 }
             }
         }
@@ -157,8 +164,9 @@ object MiuixDesign : DesignComponents {
                 navigationIcon = navigationIcon,
                 actions = actions,
             )
-        } else if (behavior != null) {
-            // Large-title variant that collapses on scroll (documented).
+        } else if (behavior != null && onBack == null) {
+            // 只有无返回按钮的根页面才用可折叠的大标题：大标题会把标题排到第二行，
+            // 与返回箭头分成两行；带返回按钮的页面必须让箭头和标题同处一行。
             MiuixTopAppBar(
                 title = title,
                 scrollBehavior = behavior,
@@ -306,6 +314,15 @@ object MiuixDesign : DesignComponents {
             }
         }
 
+        // 拿到焦点后补一次 show()：requestFocus() 本身不会唤出输入法，而且点外框
+        // 触发的焦点变化里 IME 连接可能还没建好，所以要等一帧再请求一次。
+        LaunchedEffect(focused) {
+            if (focused) {
+                withFrameNanos { }
+                keyboard?.show()
+            }
+        }
+
         fun cancel() {
             onQueryChange("")
             focused = false
@@ -327,7 +344,12 @@ object MiuixDesign : DesignComponents {
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                    ) { focusRequester.requestFocus() }
+                    ) {
+                        // requestFocus() 只给焦点、不会唤起输入法：点的是外框（不是
+                        // BasicTextField 本身）时键盘不会弹出来，必须显式 show()。
+                        focusRequester.requestFocus()
+                        keyboard?.show()
+                    }
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -420,11 +442,16 @@ object MiuixDesign : DesignComponents {
         modifier: Modifier,
         tint: Color?,
     ) {
+        // Miuix 的 LocalContentColor 默认硬编码为 Color.Black（不随暗色主题变化），
+        // 且 MiuixIconButton 不给 Icon 下发颜色：不传 tint 时深色模式下黑色图标
+        // 画在深色顶栏上不可见（首页搜索按钮即此症状）。默认取 PurrColors 的
+        // 主文字色，显式传 tint 仍优先。
+        val resolvedTint = tint ?: com.archive.app.ui.theme.LocalPurrColors.current.textPrimary
         MiuixIconButton(onClick = onClick, modifier = modifier) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = tint ?: Color.Unspecified,
+                tint = resolvedTint,
             )
         }
     }
@@ -561,21 +588,28 @@ object MiuixDesign : DesignComponents {
         isRefreshing: Boolean,
         onRefresh: () -> Unit,
         modifier: Modifier,
+        contentPadding: androidx.compose.foundation.layout.PaddingValues,
         content: @Composable () -> Unit,
     ) {
-        // 下拉刷新的三段提示由库提供，但**写死在库里且是英文**，库里也没有 strings.xml
+        // 下拉刷新的四段提示由库提供，但**写死在库里且是英文**，库里也没有 strings.xml
         // 可随系统语言切换（默认值：Pull down to refresh / Release to refresh /
-        // Refreshed successfully），所以只能由调用方传入本地化文案。
-        // 顺序即库的用法：下拉中 → 松开可刷新 → 刷新完成。
+        // Refreshing... / Refreshed successfully），所以只能由调用方传入本地化文案。
+        // 顺序即库的用法：下拉中 → 松开可刷新 → 刷新中 → 刷新完成。
         val refreshTexts = listOf(
             stringResource(com.archive.app.R.string.pull_to_refresh_pull),
             stringResource(com.archive.app.R.string.pull_to_refresh_release),
+            stringResource(com.archive.app.R.string.pull_to_refresh_refreshing),
             stringResource(com.archive.app.R.string.pull_to_refresh_done),
         )
+        // 库内置组件在 0.9.4 起下拉检测不再依赖 topAppBarScrollBehavior（官方示例即
+        // 传 null），保持默认空值即可，本应用也全面停用可折叠顶栏（见各页面注释）。
         MiuixPullToRefresh(
             isRefreshing = isRefreshing,
             onRefresh = onRefresh,
             modifier = modifier,
+            // 全屏铺底的页面（内容直接铺在顶栏下面）靠它把刷新指示器挪到顶栏下方；
+            // 内容本身不在顶栏内的页面传默认值即可，指示器随容器自然落在顶栏下方。
+            contentPadding = contentPadding,
             refreshTexts = refreshTexts,
             content = content,
         )
@@ -589,7 +623,11 @@ object MiuixDesign : DesignComponents {
         modifier: Modifier,
     ) {
         MiuixFab(onClick = onClick, modifier = modifier) {
-            Icon(imageVector = icon, contentDescription = contentDescription)
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = com.archive.app.ui.theme.LocalPurrColors.current.onPrimary,
+            )
         }
     }
 }

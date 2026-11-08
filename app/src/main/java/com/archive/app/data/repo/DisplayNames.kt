@@ -31,13 +31,18 @@ class DisplayNames @Inject constructor(
             CreatorNameCache.cacheCreatorName(service, creatorId, local)
             return local
         }
-        // 线上兜底：拉一次作者资料并缓存（失败静默，界面继续显示 id）
+        // 线上兜底：拉一次作者资料并缓存（失败静默，界面继续显示 id）。
+        // 失败也要写负缓存（空串占位）：失效/不存在的 id 若不缓存，每次渲染
+        // 都重打 profile 接口，站点限流下会 429 连锁拖垮正常请求。
         return withContext(Dispatchers.IO) {
             runCatching {
                 creatorRepository.profileName(service, creatorId)?.also { name ->
                     CreatorNameCache.cacheCreatorName(service, creatorId, name)
                 }
-            }.getOrNull()
+            }.getOrElse {
+                CreatorNameCache.cacheCreatorName(service, creatorId, "")
+                null
+            }
         }
     }
 }

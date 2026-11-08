@@ -6,9 +6,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +40,7 @@ import com.archive.app.ui.components.UpdateHistoryDialog
 import com.archive.app.ui.components.openUrl
 import com.archive.app.ui.design.AppButton
 import com.archive.app.ui.design.AppCard
+import com.archive.app.ui.design.AppDialog
 import com.archive.app.ui.design.AppDropdownSetting
 import com.archive.app.ui.design.AppListItem
 import com.archive.app.ui.design.AppScaffold
@@ -130,6 +135,41 @@ class AboutViewModel @Inject constructor(
     fun clearImageCache() {
         viewModelScope.launch { cacheRepository.clearCache() }
     }
+
+    // ── 报错日志 ──
+
+    /** 日志查看态：null = 未打开（对话框里的内容按需加载，不在进页时读盘）。 */
+    val logsText = MutableStateFlow<String?>(null)
+    val logsLoading = MutableStateFlow(false)
+
+    /** 读取全部崩溃/非致命异常日志，按时间倒序拼成一段可复制的文本。 */
+    fun loadLogs(context: android.content.Context) {
+        if (logsLoading.value) return
+        logsLoading.value = true
+        viewModelScope.launch {
+            val text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val files = com.archive.core.util.CrashHandler.getCrashLogs(context.applicationContext)
+                if (files.isEmpty()) {
+                    "暂无报错日志。\n\n应用运行期间的崩溃与非致命异常会自动记录在这里，方便反馈问题。"
+                } else {
+                    files.joinToString("\n\n──────────\n\n") { file ->
+                        runCatching { file.readText() }.getOrElse { "（读取失败：${file.name}）" }
+                    }
+                }
+            }
+            logsText.value = text
+            logsLoading.value = false
+        }
+    }
+
+    fun clearLogs(context: android.content.Context) {
+        viewModelScope.launch {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.archive.core.util.CrashHandler.clearCrashLogs(context.applicationContext)
+            }
+            logsText.value = "暂无报错日志。\n\n应用运行期间的崩溃与非致命异常会自动记录在这里，方便反馈问题。"
+        }
+    }
 }
 
 /** 检查频率选项（顺序必须与 [SettingsManager.UpdateFrequency] 的枚举顺序一致）。 */
@@ -171,6 +211,9 @@ fun AboutScreen(
         mutableStateOf(settingsManager?.getUpdateChannel() ?: SettingsManager.UpdateChannel.STABLE)
     }
     var showHistory by remember { mutableStateOf(false) }
+    var showLogs by remember { mutableStateOf(false) }
+    val logsText by viewModel.logsText.collectAsStateWithLifecycle()
+    val logsLoading by viewModel.logsLoading.collectAsStateWithLifecycle()
     var detailsOf by remember { mutableStateOf<AboutViewModel.UpdateUiState.Available?>(null) }
 
     // 拖动滑块时不要每一帧都写 DataStore：停手 400ms 再落库
@@ -321,6 +364,24 @@ fun AboutScreen(
                     },
                 )
             }
+            item {
+                AppListItem(
+                    title = "查看报错日志",
+                    summary = "应用崩溃与非致命异常的记录，可一键复制反馈",
+                    end = {
+                        Icon(
+                            imageVector = LucideIcons.chevronForward,
+                            contentDescription = null,
+                            tint = colors.textTertiary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    onClick = {
+                        viewModel.loadLogs(context)
+                        showLogs = true
+                    },
+                )
+            }
 
             // ── 来源与许可 ──
             item { AppSmallTitle("来源与许可") }
@@ -339,6 +400,15 @@ fun AboutScreen(
 
         // 弹窗必须写在 AppScaffold **内部**：Miuix 的 OverlayDialog 依赖 Scaffold 提供的
         // popup 宿主（写在它外面会静默不显示，看起来就像「点了没反应」）。
+        if (showLogs) {
+            LogViewerDialog(
+                text = logsText,
+                loading = logsLoading,
+                onDismiss = { showLogs = false },
+                onClear = { viewModel.clearLogs(context) },
+            )
+        }
+
         if (showHistory) {
             UpdateHistoryDialog(
                 loading = historyLoading,
@@ -367,8 +437,7 @@ fun AboutScreen(
 }
 
 /** 检查结果 → 界面状态（手动检查与启动自动检查的结论共用同一条映射）。 */
-private fun UpdateResult?.toUiState(): AboutViewModel.UpdateUiState = when (this) {
-    null -> AboutViewModel.UpdateUiState.Idle
+private fun UpdateResult?.toUiState(): AboutViewModel.UpdateUiState = when (this) {    null -> AboutViewModel.UpdateUiState.Idle
     is UpdateResult.UpdateAvailable -> AboutViewModel.UpdateUiState.Available(
         latestVersion = latestVersion,
         publishedAt = publishedAt,
@@ -396,4 +465,76 @@ private fun statusSubtitle(lastCheckAt: Long): String {
     val version = "Archive ${BuildConfig.VERSION_NAME}"
     val last = if (lastCheckAt <= 0L) "从未检查" else "上次检查：${Fmt.relative(lastCheckAt / 1000)}"
     return "$version · $last"
+}
+
+/**
+ * 报错日志查看器：等宽等宽排版、可选中，底部「复制全部」把整段日志放进剪贴板。
+ *
+ * 日志来自 [com.archive.core.util.CrashHandler] 落盘的 crash_logs 目录下的 txt 文件
+ * （崩溃 + logNonFatal 收集的非致命异常都在里面）。内容可能很长，所以放在可滚动容器里，
+ * 并且用 SelectionContainer 保证用户还能手动挑一段复制。
+ */
+@Composable
+private fun LogViewerDialog(
+    text: String?,
+    loading: Boolean,
+    onDismiss: () -> Unit,
+    onClear: () -> Unit,
+) {
+    val context = LocalContext.current
+    val colors = LocalPurrColors.current
+    var copied by remember { mutableStateOf(false) }
+
+    AppDialog(
+        show = true,
+        title = "报错日志",
+        onDismiss = onDismiss,
+        confirmLabel = if (loading) "读取中…" else "复制全部",
+        onConfirm = {
+            if (!loading && !text.isNullOrBlank()) {
+                val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                clipboard?.setPrimaryClip(
+                    android.content.ClipData.newPlainText("Archive 报错日志", text),
+                )
+                copied = true
+            }
+        },
+        dismissLabel = "关闭",
+    ) {
+        when {
+            loading -> AppText("正在读取日志…", style = AppTextStyle.SMALL)
+            else -> {
+                androidx.compose.foundation.text.selection.SelectionContainer {
+                    androidx.compose.foundation.layout.Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 360.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        AppText(
+                            text.orEmpty(),
+                            style = AppTextStyle.SMALL,
+                            color = colors.textSecondary,
+                        )
+                    }
+                }
+                if (copied) {
+                    AppText(
+                        "已复制到剪贴板",
+                        style = AppTextStyle.SMALL,
+                        color = colors.primary,
+                    )
+                }
+                AppButton(
+                    text = "清空日志",
+                    onClick = {
+                        copied = false
+                        onClear()
+                    },
+                    primary = false,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
 }

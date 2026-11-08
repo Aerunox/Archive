@@ -137,6 +137,7 @@
     <string name="history_local_only">이 기기에만 저장됩니다</string>
     <string name="pull_to_refresh_pull">아래로 당겨 새로 고침</string>
     <string name="pull_to_refresh_release">놓아서 새로 고침</string>
+    <string name="pull_to_refresh_refreshing">새로 고침 중…</string>
     <string name="pull_to_refresh_done">새로 고침 완료</string>
     <string name="register_web_hint">가입에는 captcha가 필요해 아래에 공식 가입 페이지를 삽입했습니다. 페이지에서 가입하거나 로그인하면 앱이 자동으로 로그인합니다. 안 되면 「로그인」 탭을 이용하세요.</string>
     <string name="register_web_open_browser">브라우저에서 열기</string>

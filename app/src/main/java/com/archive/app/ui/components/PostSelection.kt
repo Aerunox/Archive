@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +43,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import com.archive.data.repository.BlockedCreatorManager
 import com.archive.app.domain.PostSummary
+import com.archive.app.ui.design.AppSpinner
 import com.archive.app.ui.design.AppText
 import com.archive.app.ui.design.AppTextStyle
 import com.archive.app.ui.design.lucide.LucideIcons
@@ -290,11 +290,7 @@ fun PostSelectionBar(
             modifier = Modifier.weight(1f),
         )
         if (busy) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(18.dp),
-                color = colors.primary,
-                strokeWidth = 2.dp,
-            )
+            AppSpinner(size = 18.dp, color = colors.primary)
         } else {
             BarAction("屏蔽作者", LucideIcons.close, colors.error, onBlock)
             BarAction("屏蔽帖子", LucideIcons.tasks, colors.error, onBlockPosts)

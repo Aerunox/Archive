@@ -10,7 +10,10 @@ object Fmt {
 
     fun relative(unixSeconds: Long?): String {
         if (unixSeconds == null || unixSeconds <= 0) return "未知"
-        val time = LocalDateTime.now().plusSeconds(unixSeconds - System.currentTimeMillis() / 1000)
+        // 一步构造目标时间，避免 now() 两次取值不一致带来的偏差
+        val time = java.time.Instant.ofEpochSecond(unixSeconds)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toLocalDateTime()
         return relative(LocalDateTime.now(), time)
     }
 
@@ -18,7 +21,8 @@ object Fmt {
         val d = Duration.between(time, now)
         val seconds = d.seconds
         return when {
-            seconds < 0 -> "刚刚"
+            // 未来时间（定时发布/时钟偏差）不应显示"刚刚"
+            seconds < -60 -> "即将"
             seconds < 60 -> "刚刚"
             seconds < 3600 -> "${seconds / 60} 分钟前"
             seconds < 86400 -> "${seconds / 3600} 小时前"

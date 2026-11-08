@@ -25,12 +25,6 @@ object ApiClient {
 
     private val httpClientFactory = HttpClientFactory()
 
-    // authApi 实例缓存，key 为对应的 sessionCookie
-    @Volatile
-    private var cachedAuthApi: PawchiveApi? = null
-    @Volatile
-    private var cachedAuthCookie: String? = null
-
     /**
      * 暴露给外部（Coil 图片加载、视频、下载逻辑等）使用的 OkHttpClient，
      * 已注入 Cloudflare 凭据与 403 兜底。
@@ -65,10 +59,17 @@ object ApiClient {
             .create(PawchiveApi::class.java)
     }
 
+    /** (cookie, api) 成对缓存：单一不可变快照原子替换，避免两字段 check-then-set
+     *  在切号并发时交错出"cookie 是 A、api 挂 B cookie"的错配实例。 */
+    private data class AuthApiEntry(val cookie: String, val api: PawchiveApi)
+
+    @Volatile
+    private var cachedAuthApiEntry: AuthApiEntry? = null
+
     fun authApi(sessionCookie: String): PawchiveApi {
         // 复用同一 sessionCookie 对应的实例，避免每次调用都重建 OkHttp/Retrofit
-        cachedAuthApi?.let { cached ->
-            if (cachedAuthCookie == sessionCookie) return cached
+        cachedAuthApiEntry?.let { cached ->
+            if (cached.cookie == sessionCookie) return cached.api
         }
 
         // 设定当前会话 hash，使内存缓存归入该账号命名空间（P2：用 hash 替代明文 cookie）
@@ -86,8 +87,8 @@ object ApiClient {
             .build()
             .create(PawchiveApi::class.java)
 
-        cachedAuthCookie = sessionCookie
-        cachedAuthApi = api
+        // 单字段原子替换：读者要么看到旧的完整配对，要么看到新的完整配对
+        cachedAuthApiEntry = AuthApiEntry(sessionCookie, api)
         return api
     }
 
@@ -109,8 +110,7 @@ object ApiClient {
      */
     fun clearMemoryCache() {
         ApiMemoryCache.clear()
-        cachedAuthApi = null
-        cachedAuthCookie = null
+        cachedAuthApiEntry = null
         ApiMemoryCache.currentSessionHash = null
     }
 

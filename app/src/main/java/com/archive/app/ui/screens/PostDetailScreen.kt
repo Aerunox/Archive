@@ -158,6 +158,9 @@ class PostDetailViewModel @Inject constructor(
 
     val detail = MutableStateFlow<Result<PostDetail>?>(null)
     val comments = MutableStateFlow<List<PostComment>>(emptyList())
+
+    /** 评论加载失败标记：与"0 条评论"区分（此前失败被 getOrDefault 折叠成空列表）。 */
+    val commentsError = MutableStateFlow(false)
     val revisions = MutableStateFlow<List<PostRevision>>(emptyList())
     val loading = MutableStateFlow(true)
 
@@ -216,9 +219,14 @@ class PostDetailViewModel @Inject constructor(
                     ),
                 )
             }
-            comments.value = runCatching {
+            // 失败不与"0 条评论"混同：置错误标记，评论区显示加载失败（原因进 logcat 可查）
+            runCatching {
                 postRepository.comments(service, creatorId, postId)
-            }.getOrDefault(emptyList())
+            }.onSuccess { comments.value = it }
+                .onFailure { e ->
+                    android.util.Log.w("PostDetail", "评论加载失败 $service/$creatorId/$postId", e)
+                    commentsError.value = true
+                }
             loading.value = false
         }
         // 作者显示名（本地作者库 → 内存缓存 → 线上兜底）与订阅状态
@@ -316,6 +324,7 @@ fun PostDetailScreen(
 ) {
     val detailResult by viewModel.detail.collectAsStateWithLifecycle()
     val comments by viewModel.comments.collectAsStateWithLifecycle()
+    val commentsError by viewModel.commentsError.collectAsStateWithLifecycle()
     val revisions by viewModel.revisions.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
     val isFavorite by viewModel.isFavorite.collectAsStateWithLifecycle()
@@ -380,6 +389,7 @@ fun PostDetailScreen(
                     onToggleSubscribe = viewModel::toggleSubscribe,
                     onDownloadAll = { viewModel.downloadAllImages(post) },
                     comments = comments,
+                    commentsError = commentsError,
                     revisions = revisions,
                     baseUrl = baseUrl,
                     // 图片与视频共用同一个查看器入口：index 是统一媒体列表里的下标
@@ -414,6 +424,7 @@ private fun DetailContent(
     onToggleSubscribe: () -> Unit,
     onDownloadAll: () -> Unit,
     comments: List<PostComment>,
+    commentsError: Boolean,
     revisions: List<PostRevision>,
     baseUrl: String,
     onOpenMedia: (Int) -> Unit,
@@ -432,7 +443,10 @@ private fun DetailContent(
     }
     val playableVideos = videoEntries.filter { it.url != null && !it.attachment.tempLinkExpired() }
     val nonImageMedia = media.filter { it.kind() == MediaKind.AUDIO } +
-        videoEntries.filterNot { it in playableVideos }.map { it.attachment }
+        videoEntries.filterNot { it in playableVideos }.map { it.attachment } +
+        // 其他格式（zip/pdf/doc 等 MediaKind.FILE）：此前不在任何渲染列表，
+        // 附件行完全不显示也无法点下载；与音频行同样用"文件名 + 下载按钮"行展示
+        media.filter { it.kind() == MediaKind.FILE }
     val mainImage = post.file?.takeIf { it.kind() == MediaKind.IMAGE && !it.path.isNullOrBlank() }
     // 统一媒体查看器的页列表（图片 + 可播放视频混排）：缩略图/海报格都用它换算查看器下标，
     // 与查看器内部同源，保证「点哪张就从哪张开始左右滑」，且能连续滑到相邻的另一种媒体
@@ -533,6 +547,16 @@ private fun DetailContent(
             }
         }
 
+        // 帖子翻译横幅（对照 X 译帖的「文A 翻译自英语 显示原文 ⚙」）：放在标题与正文上方，
+        // 译文由下面的标题 / 正文原地替换渲染，段落结构与原文严格对齐。
+        // 接口/提示词/采样参数在「我 → 设置 → 帖子翻译」里配。
+        item {
+            com.archive.app.ui.components.PostTranslationSection(
+                title = post.title,
+                contentHtml = post.contentHtml,
+            )
+        }
+
         // ── 标题 / 正文文本（全宽，不缩进）──
         item {
             // 翻译开启时标题**原地替换**为译文（与正文同一次请求返回，不多打接口）
@@ -588,15 +612,6 @@ private fun DetailContent(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                 )
             }
-        }
-
-        // 帖子翻译控件（对照参考图的「显示翻译 + 齿轮」）：译文由上面的标题 / 正文原地替换。
-        // 接口/提示词/采样参数在「我 → 设置 → 帖子翻译」里配。
-        item {
-            com.archive.app.ui.components.PostTranslationSection(
-                title = post.title,
-                contentHtml = post.contentHtml,
-            )
         }
 
         if (post.previewOnly) {
@@ -753,6 +768,11 @@ private fun DetailContent(
             nonImageMedia.forEachIndexed { mediaIndex, attachment ->
                 item(key = mediaKey(mediaIndex, attachment)) {
                     val playbackUrl = UrlProvider.playbackUrl(baseUrl, attachment.path, attachment.tempUrl)
+                    // 其他格式（zip/pdf）没有"播放"概念，能否取得直链才是它们的状态依据；
+                    // 只按播放地址判会把"可下载但不可播放"的 deferred 附件误报成未导入
+                    val downloadUrl = UrlProvider.downloadUrl(
+                        baseUrl, attachment.path, attachment.tempDownloadUrl,
+                    )
                     val expired = attachment.tempLinkExpired()
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                         if (attachment.kind() == MediaKind.AUDIO && playbackUrl != null && !expired) {
@@ -784,6 +804,11 @@ private fun DetailContent(
                             attachment.previewOnly -> androidx.compose.ui.res.stringResource(
                                 com.archive.app.R.string.link_preview_only_long,
                             )
+
+                            attachment.kind() == MediaKind.FILE ->
+                                if (downloadUrl == null) androidx.compose.ui.res.stringResource(
+                                    com.archive.app.R.string.link_deferred_long,
+                                ) else null
 
                             playbackUrl == null -> androidx.compose.ui.res.stringResource(
                                 com.archive.app.R.string.link_deferred_long,
@@ -829,6 +854,24 @@ private fun DetailContent(
             items(comments.take(50).size) { i ->
                 val comment = comments.take(50)[i]
                 CommentRow(comment = comment, baseUrl = baseUrl)
+            }
+        } else if (commentsError) {
+            item {
+                AppText(
+                    text = "评论加载失败",
+                    style = AppTextStyle.SECONDARY,
+                )
+            }
+        } else {
+            // 站点对无评论的帖子返回 404（仓库层转成空列表），这里给个占位；
+            // DetailContent 只在 loading 结束后渲染，此时空列表就是真的没有评论
+            item {
+                AppText(
+                    text = "暂无评论",
+                    style = AppTextStyle.SECONDARY,
+                    color = colors.textTertiary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
             }
         }
 

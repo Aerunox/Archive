@@ -137,6 +137,7 @@
     <string name="history_local_only">Stored on this device only</string>
     <string name="pull_to_refresh_pull">Pull down to refresh</string>
     <string name="pull_to_refresh_release">Release to refresh</string>
+    <string name="pull_to_refresh_refreshing">Refreshing…</string>
     <string name="pull_to_refresh_done">Refreshed successfully</string>
     <string name="register_web_hint">Registration requires a captcha, so the official page is embedded below. Register or log in there and the app signs you in automatically; otherwise use the Log in tab.</string>
     <string name="register_web_open_browser">Open in browser</string>
@@ -145,4 +146,18 @@
     <string name="open_browser_failed">Cannot open a browser. Please visit manually: %1$s</string>
     <string name="action_retry">Retry</string>
     <string name="mine_signed_in_title">Signed in</string>
+
+    <!-- Settings categories (icon + title + summary + chevron, per the reference layout).
+         Summaries are built at runtime from the item titles in each category. -->
+    <string name="settings_search_hint">Search settings</string>
+    <string name="settings_no_results">No matching settings</string>
+    <string name="settings_back_to_list">Back to categories</string>
+    <string name="settings_cat_appearance">Appearance</string>
+    <string name="settings_cat_privacy">Privacy &amp; security</string>
+    <string name="settings_cat_network">Network</string>
+    <string name="settings_cat_browse">Browsing &amp; search</string>
+    <string name="settings_cat_download">Download</string>
+    <string name="settings_cat_storage">Storage &amp; cleanup</string>
+    <string name="settings_cat_ai">AI features</string>
+    <string name="settings_cat_blocked">Blocked content</string>
 </resources>

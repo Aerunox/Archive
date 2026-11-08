@@ -39,17 +39,25 @@ class OcrService @Inject constructor(
     @Volatile
     private var releasePending = false
 
+    /** 释放请求代际号：区分"本次识别开始前"与"识别进行中"收到的释放请求。
+     *  否则 release 落在 inFlight 已计数但尚未进 ensureEngine 的窗口时，
+     *  ensureEngine 会误清 releasePending，该次释放永久丢失（~16MB 常驻）。 */
+    private val releaseGen = java.util.concurrent.atomic.AtomicLong(0)
+
     /** 识别一张网络图片，返回按阅读顺序排好的文本行。取不到图时**抛错**（含 HTTP 码）。 */
     suspend fun recognize(url: String): List<OcrEngine.Line> {
         val image = withContext(Dispatchers.IO) { loadImage(url) }
         // 先计数再取引擎：否则「取到引擎」与「开始用」之间存在窗口，
         // 恰好这时收到 trim 会把正在用的会话关掉，崩在原生层
         inFlight.incrementAndGet()
+        val observedGen = releaseGen.get()
         try {
             val ocr = ensureEngine()
             return withContext(Dispatchers.Default) { ocr.recognize(image) }
         } finally {
             if (inFlight.decrementAndGet() == 0 && releasePending) releaseEngine()
+            // ensureEngine 期间若来了新的释放请求（gen 已前进），最后再补一次释放
+            if (inFlight.get() == 0 && releaseGen.get() != observedGen) releaseEngine()
         }
     }
 
@@ -65,9 +73,11 @@ class OcrService @Inject constructor(
     fun releaseEngine() {
         if (inFlight.get() > 0) {
             releasePending = true
+            releaseGen.incrementAndGet()
             return
         }
         releasePending = false
+        releaseGen.incrementAndGet()
         val old = engine ?: return
         engine = null
         runCatching { old.close() }
@@ -77,8 +87,8 @@ class OcrService @Inject constructor(
         engine?.let { return it }
         return lock.withLock {
             engine?.let { return@withLock it }
-            // 新建即视为「已满足释放请求」，避免刚建好又被上一次的标记关掉
-            releasePending = false
+            // 新建完成后若有未决的释放请求，立即关掉刚建的引擎：
+            // 不清 releasePending——识别方 finally 会负责执行释放
             val built = OcrEngine.create(
                 OrtEnvironment.getEnvironment(),
                 readAsset(DET_MODEL),

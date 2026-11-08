@@ -119,6 +119,25 @@ class ArchiveApp : Application(), Configuration.Provider, SingletonImageLoader.F
     }
 
     private fun scheduleAutoCacheCleanIfNeeded() {
+        // 先按当前开关与频率把周期任务注册 / 取消好（每天 / 每周 / 每月走周期任务；
+        // 「每次启动」没有周期档，下面在启动时排一次性任务）。
+        CacheCleanWorker.schedule(this, settingsManager.isAutoCleanCacheEnabled(), settingsManager.getCacheCleanFrequency())
+
+        // 保留原有阈值策略：缓存超阈值时立即清理一次（容量兜底）。
+        scheduleThresholdClean()
+
+        // 「每次启动」档：每次冷启动排一次清理（延迟错峰，避开 Coil 初始化与启动期文件竞争）。
+        if (settingsManager.isAutoCleanCacheEnabled() &&
+            settingsManager.getCacheCleanFrequency() == SettingsManager.CacheCleanFrequency.EVERY_LAUNCH
+        ) {
+            val request = OneTimeWorkRequestBuilder<CacheCleanWorker>()
+                .setInitialDelay(10L, TimeUnit.SECONDS)
+                .build()
+            WorkManager.getInstance(this@ArchiveApp).enqueue(request)
+        }
+    }
+
+    private fun scheduleThresholdClean() {
         applicationScope.launch {
             if (!cacheRepository.isAutoCleanEnabled()) return@launch
             if (!CacheCleanWorker.shouldCleanByThreshold(cacheRepository)) return@launch

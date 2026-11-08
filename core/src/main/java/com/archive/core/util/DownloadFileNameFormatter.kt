@@ -64,7 +64,10 @@ object DownloadFileNameFormatter {
             .orEmpty()
         val base = title?.takeIf { it.isNotBlank() }
             ?: original.substringBeforeLast('.', "").ifBlank { FALLBACK_BASE_NAME }
-        return "${base}_$stamp$ext".take(MAX_NAME_LENGTH)
+        // 先截 base 再拼接：base 已可达 100 字符，整串 take(MAX) 会把时间戳+扩展名
+        // 截掉（`长标题_20250101_120000` 丢 .zip），落盘文件失去扩展名无法被识别打开。
+        val maxBase = (MAX_NAME_LENGTH - stamp.length - 1).coerceAtLeast(1)
+        return "${base.take(maxBase)}_$stamp$ext"
     }
 
     /**

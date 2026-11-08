@@ -589,7 +589,9 @@ class DownloadCenter @Inject constructor(
     suspend fun selfHealPending() {
         val pending = historyManager.getPendingRecords()
         for (record in pending) {
-            if (!activeDownloads.containsKey(record.dedupKey)) {
+            // legacy 记录（v1→v2 迁移前）dedupKey 为 null，ConcurrentHashMap.containsKey(null)
+            // 直接抛 NPE，整批自愈中断——跳过无法判重的记录。
+            if (record.dedupKey != null && !activeDownloads.containsKey(record.dedupKey)) {
                 Log.i(TAG, "selfHeal: restarting record=${record.id}")
                 launchDownload(record)
             }

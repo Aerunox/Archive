@@ -38,7 +38,15 @@ class SessionInterceptor @Inject constructor(private val settings: SettingsRepos
     override fun intercept(chain: Interceptor.Chain): Response {
         val cookie = settings.sessionCookieOnce()
         if (cookie.isBlank()) return chain.proceed(chain.request())
-        val value = cookie.substringAfter("session=", cookie).trim().removePrefix(";").trim()
+        // 用户可能粘贴完整 Cookie 头（含多个 cookie）：按分号拆段后取 session= 段，
+        // 只在串中间时 substringAfter 会把后面的无关 cookie 一并塞进 session 值
+        val value = cookie.split(';')
+            .map { it.trim() }
+            .firstOrNull { it.startsWith("session=") }
+            ?.removePrefix("session=")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: cookie
         return chain.proceed(
             chain.request().newBuilder()
                 .header("Cookie", "session=$value")

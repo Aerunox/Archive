@@ -66,7 +66,9 @@ class OcrEngine private constructor(
             var scoreSum = 0f
             for (box in block.sortedWith(compareBy({ it.top }, { it.left }))) {
                 val (text, score) = recognizeLine(image, box)
-                if (text.isNotBlank()) {
+                // RapidOCR config.yaml 的 Global.text_score：整行平均置信度过低
+                // （多为检测框里的噪声/水印）直接丢弃，不让乱码进入段落
+                if (text.isNotBlank() && score >= REC_MIN_LINE_SCORE) {
                     parts += text
                     scoreSum += score
                 }
@@ -456,12 +458,6 @@ class OcrEngine private constructor(
         return sb.toString() to sum / count
     }
 
-    private fun softmaxProb(step: FloatArray, best: Int, bestLogit: Float): Float {
-        var sum = 0.0
-        for (v in step) sum += kotlin.math.exp((v - bestLogit).toDouble())
-        return (1.0 / sum).toFloat()
-    }
-
     override fun close() {
         rec.close()
         det.close()
@@ -486,9 +482,8 @@ class OcrEngine private constructor(
         private const val REC_MAX_WIDTH = 2048
         private const val REC_MIN_WIDTH = 16
 
-        /** Global.text_score：整行平均置信度低于它就丢弃；单字再卡一道 0.3。 */
+        /** Global.text_score：整行平均置信度低于它就丢弃（recognize() 里的行级过滤）。 */
         private const val REC_MIN_LINE_SCORE = 0.5f
-        private const val REC_MIN_CHAR_SCORE = 0.3f
 
         /**
          * 建引擎。[detModel] / [recModel] 是 ONNX 模型字节（assets 或文件都行），

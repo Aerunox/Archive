@@ -119,11 +119,20 @@ class BackupManager @Inject constructor(
      * @throws IllegalArgumentException 文件无效或 schemaVersion 不兼容
      */
     suspend fun import(json: String): BackupImportResult {
+        // 先要求顶层是 JSON 对象且显式携带 schemaVersion：gson.fromJson("{}") 会得到
+        // 全默认值的 BackupBundle（schemaVersion 默认恰好等于 SCHEMA_VERSION），若无此
+        // 检查，误选一个空/无关 JSON 文件就会通过校验，随后覆盖式导入清空全部本地数据。
+        val root = runCatching {
+            com.google.gson.JsonParser.parseString(json).takeIf { it.isJsonObject }?.asJsonObject
+        }.getOrNull()
+            ?: throw IllegalArgumentException("invalid backup file")
+        val schemaVersion = root.get("schemaVersion")?.takeIf { !it.isJsonNull }?.asInt
+            ?: throw IllegalArgumentException("invalid backup file")
         val bundle = runCatching { gson.fromJson(json, BackupBundle::class.java) }
             .getOrNull()
             ?: throw IllegalArgumentException("invalid backup file")
-        if (bundle.schemaVersion != SCHEMA_VERSION) {
-            throw IllegalArgumentException("unsupported backup schema: ${bundle.schemaVersion}")
+        if (schemaVersion != SCHEMA_VERSION) {
+            throw IllegalArgumentException("unsupported backup schema: $schemaVersion")
         }
 
         bookmarkManager.importAll(
@@ -160,13 +169,14 @@ class BackupManager @Inject constructor(
         settings.hideBookmarkedCreators?.let { settingsManager.setHideBookmarkedCreatorsEnabled(it) }
     }
 
-    /** 剔除设备绑定 / 瞬时状态字段：进度、文件路径（SAF/MediaStore uri）、错误信息；进行中任务归一为已完成。 */
+    /** 剔除设备绑定 / 瞬时状态字段：进度、文件路径（SAF/MediaStore uri）、错误信息；
+     *  进行中任务归一为 CANCELLED——备份时文件并未落地，恢复后按"已完成"呈现会指向不存在的文件。 */
     private fun sanitizeDownload(record: DownloadRecord): DownloadRecord = record.copy(
         progress = 0,
         filePath = null,
         errorMessage = null,
         status = if (record.status == DownloadStatus.PENDING || record.status == DownloadStatus.RUNNING) {
-            DownloadStatus.COMPLETED
+            DownloadStatus.CANCELLED
         } else {
             record.status
         }

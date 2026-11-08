@@ -7,7 +7,7 @@ plugins {
 }
 
 /** 版本号单点定义：`defaultConfig` 与 APK 文件名都用它，避免两处漂移。 */
-val appVersionName = "1.0.0"
+val appVersionName = "1.0.1"
 
 android {
     namespace = "com.archive.app"
@@ -18,20 +18,29 @@ android {
         applicationId = "com.archive.app"
         minSdk = 30
         targetSdk = 36
-        versionCode = 1
+        versionCode = 2
         versionName = appVersionName
+    }
 
-        // OCR 依赖 ONNX Runtime 的原生库，每个 ABI 约 15MB。只保留 arm64-v8a
-        // （本项目目标设备均为 arm64），否则 APK 会白胖出几十 MB。
-        ndk {
-            abiFilters += "arm64-v8a"
+    // 多架构打包（永久生效）：按 ABI 拆分出四个单架构 APK + 一个 universal 全架构包。
+    // OCR 依赖 ONNX Runtime 的原生库（四 ABI 全有，单个 ABI 的 so 约 15MB），拆包后
+    // 单架构包各自只带自己那套 so，universal 包则同时含四套（体积大，供兼容安装用）。
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            isUniversalApk = true
         }
     }
 
     // 用调试签名打包 release，保证 APK 可直接安装（正式发布请替换为自己的 keystore）
     signingConfigs {
         create("debugSign") {
-            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+            // 优先用工作区内 keystore（沙箱环境写不了 ~/.android），退回系统默认
+            val localKeystore = rootProject.file(".gradle-home/debug.keystore")
+            storeFile = if (localKeystore.exists()) localKeystore
+            else file("${System.getProperty("user.home")}/.android/debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
             keyPassword = "android"
@@ -73,18 +82,23 @@ android {
     androidResources {
         localeFilters += listOf(
             "zh", "zh-rTW", // 中文（默认 values/ 为其简体）与繁体
-            "en", "de", "es", "fr", "in", "id", "ja", "ko", "ru",
+            "en", "de", "es", "fr", "in", "id", "ja", "ko", "ru", "tr", "ar",
         )
     }
 }
 
-// APK 输出文件名：AGP 默认按**模块名**命名（app-release.apk），这里改成项目名 + 版本号，
-// 方便在 Releases 页一眼认出。 用官方 Variant API，不改模块名，也不影响安装与升级。
+// APK 输出文件名：AGP 默认按**模块名**命名（app-release.apk），这里改成项目名 + 版本号 + ABI，
+// 方便在 Releases 页一眼认出（splits 拆包后每个 output 各对应一个 ABI，
+// universal 包没有 versionCode 后缀差异，用 "universal" 标识）。用官方 Variant API，
+// 不改模块名，也不影响安装与升级。
 androidComponents {
     onVariants { variant ->
         val buildType = variant.buildType ?: "release"
         variant.outputs.forEach { output ->
-            output.outputFileName.set("Archive-$appVersionName-$buildType.apk")
+            // splits 模式下 output.filters 带 ABI 过滤：filterType 是类型名（"ABI"），
+            // 真正的架构名在 identifier 里（arm64-v8a 等）；universal 包 filters 为空。
+            val abiSuffix = output.filters.firstOrNull()?.identifier?.let { "-$it" } ?: "-universal"
+            output.outputFileName.set("Archive-$appVersionName-$buildType$abiSuffix.apk")
         }
     }
 }

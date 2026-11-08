@@ -163,6 +163,7 @@ class HttpDownloadManager @Inject constructor(
         }
 
         var tempFileRef: File? = null
+        var copyOutFinished = false
         try {
             val file = downloadToFile(
                 url,
@@ -189,12 +190,19 @@ class HttpDownloadManager @Inject constructor(
                 }
             }
             outputStream.flush()
+            copyOutFinished = true
             return file.length()
         } finally {
             // 异常路径也要收尾
             if (!progressChannel.isClosedForSend) progressChannel.close()
             if (!progressJob.isCompleted) { progressJob.cancel(); progressJob.join() }
-            tempFileRef?.let { if (!it.delete()) Log.w(TAG, "Failed to delete temp file: ${it.absolutePath}") }
+            // 仅在**正常完成**（拷贝写出已结束）后删除临时文件。下载阶段被暂停/取消
+            // 时必须保留临时文件与 tempOffset 检查点，下次才能断点续传；原实现 finally
+            // 无条件删除，取消发生在拷贝写出阶段时（tempFileRef 已非空）几十 MB 的
+            // 半成品被删掉，恢复只能从 0 重下。
+            if (copyOutFinished) {
+                tempFileRef?.let { if (!it.delete()) Log.w(TAG, "Failed to delete temp file: ${it.absolutePath}") }
+            }
         }
     }
 

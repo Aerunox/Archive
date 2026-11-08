@@ -20,7 +20,9 @@ enum class AppLanguage(val tag: String, val label: String) {
     GERMAN("de", "Deutsch"),
     SPANISH("es", "Español"),
     RUSSIAN("ru", "Русский"),
-    INDONESIAN("id", "Bahasa Indonesia");
+    INDONESIAN("id", "Bahasa Indonesia"),
+    TURKISH("tr", "Türkçe"),
+    ARABIC("ar", "العربية");
 
     val isSystem: Boolean get() = this == SYSTEM
 

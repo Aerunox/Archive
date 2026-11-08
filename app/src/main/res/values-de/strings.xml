@@ -137,6 +137,7 @@
     <string name="history_local_only">Nur auf diesem Gerät gespeichert</string>
     <string name="pull_to_refresh_pull">Zum Aktualisieren ziehen</string>
     <string name="pull_to_refresh_release">Loslassen zum Aktualisieren</string>
+    <string name="pull_to_refresh_refreshing">Wird aktualisiert…</string>
     <string name="pull_to_refresh_done">Erfolgreich aktualisiert</string>
     <string name="register_web_hint">Die Registrierung erfordert ein Captcha, daher ist die offizielle Seite unten eingebettet. Nach Registrierung oder Anmeldung dort meldet sich die App automatisch an; sonst den Tab „Anmelden“ nutzen.</string>
     <string name="register_web_open_browser">Im Browser öffnen</string>

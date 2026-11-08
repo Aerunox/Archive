@@ -30,7 +30,11 @@ object FlexStringListSerializer : KSerializer<List<String>> {
         val element = (decoder as JsonDecoder).decodeJsonElement()
         return when (element) {
             is JsonNull -> emptyList()
-            is JsonArray -> element.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString || !p.isString }?.content }
+            is JsonArray -> element.mapNotNull { item ->
+                // JsonNull 是 JsonPrimitive 的子类，其 content 是字面量 "null"——
+                // 若不过滤会产出 "null" 字符串混进 tags。
+                (item as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
+            }
             is JsonPrimitive -> parsePostgresArray(element.content)
             else -> emptyList()
         }
