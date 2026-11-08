@@ -1,180 +1,305 @@
-# Archive（Pawchive 第三方客户端）
+<p align="center">
+  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp" alt="Archive" width="120" />
+</p>
 
-[![release](https://img.shields.io/github/v/release/Aerunox/Archive)](https://github.com/Aerunox/Archive/releases/latest)
-[![open issues](https://img.shields.io/github/issues/Aerunox/Archive?color=brightgreen)](https://github.com/Aerunox/Archive/issues?q=is%3Aopen+is%3Aissue)
+<h1 align="center">Archive</h1>
 
-* 本应用为基于 Kemono 的内容归档站 [Pawchive](https://pawchive.pw) 的安卓第三方客户端，
-  Miuix（HyperOS 风格）单视觉主题的 Jetpack Compose 应用
-* 项目已开源且仅供交流和学习使用，不得用于任何商业用途
-* 本应用是纯客户端：不内置、不转存任何内容，不上传任何用户数据，无统计 SDK；
-  所有内容版权归属原站与各著作者，推荐支持原站 Pawchive
-* 站点含成人内容：首次启动有 18+ 确认，可选缩略图模糊与禁止截屏（FLAG_SECURE）
+<p align="center">
+  一款精致、流畅的第三方 Android 客户端，为你带来 <a href="https://pawchive.pw">Pawchive</a> 平台的完整体验。<br/>
+  基于 Kemono 的内容归档站：聚合 Patreon、Fanbox 等平台的创作者内容，支持浏览、搜索、收藏、下载与端上 OCR。<br/>
+  采用 Miuix（HyperOS 风格）的 Jetpack Compose 单视觉主题。
+</p>
 
-## 1. 功能
+<p align="center">
+  <a href="https://github.com/Aerunox/Archive/releases/latest"><img src="https://img.shields.io/github/v/release/Aerunox/Archive?style=for-the-badge&label=%E6%9C%80%E6%96%B0%E7%89%88" alt="Release" /></a>
+  <img src="https://img.shields.io/badge/Kotlin-2.3.21-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin" />
+  <img src="https://img.shields.io/badge/API-30%2B-34A853?style=for-the-badge&logo=android&logoColor=white" alt="Min API" />
+  <img src="https://img.shields.io/badge/Target_API-36-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Target API" />
+</p>
 
-* 底部四 Tab：**首页 / 发现 / 收藏 / 我**
-* 首页：全站最新帖子（Paging 3 增量加载）、全站搜索（防抖）、列表/网格双布局切换、
-  「同作者仅显示一条」「隐藏已收藏创作者」选项、搜索框原位展开、加号 FAB 展开面板
-* 发现：9 万+ 作者全量缓存到本地（Room），本地搜索 / service 筛选 / 排序 / 一键同步，
-  行内点开原地展开详情面板
-* 帖子：详情（HTML 正文渲染）、标签、上/下一篇、图片网格 → 全屏查看器（翻页 + 双指缩放）、
-  视频/音频 Media3 播放、评论、修订历史、附件批量下载（按钮展开为步进器）、X 风格 AI 翻译横幅
-* 账号：内置 WebView 完成站点登录、自动捕获 `session` Cookie（仅存本机）、
-  多账号保存与一键切换（数据隔离）、退出登录一键清除
-* 收藏与历史：本地收藏 + 浏览历史（无需登录）；登录后看账号收藏并云端同步，
-  离线操作进待补写队列自动补写
-* 离线归档：收藏即建 Room FTS4 全文索引（中文 bigram 分词），断网可全文检索与阅读
-* 下载中心：自研 OkHttp 流式引擎，HTTP Range 断点续传，每任务独立通知（进度/速度，暂停·继续·取消）、
-  并发上限、仅 Wi-Fi、SAF 自定义目录、文件命名格式、`preview_only` 自动跳过
-* 订阅与通知：订阅创作者、可配间隔后台增量同步新帖、系统通知 + 应用内通知中心（未读角标、已读管理）
-* 搜索：关键词（帖子/创作者/离线归档三 Tab）、文件哈希反查（MD5 / SHA-256，含 Discord 结果）、搜索历史
-* 创作者页：帖子 / 公告 / 标签 / 粉丝卡 / 相似作者 / 关联账号 六个 Tab
-* AI 功能：多供应商（OpenAI Chat/Responses、Anthropic、Gemini）的帖子翻译与图片理解/问答，
-  多模型档案、深度思考与联网搜索开关（默认全关）
-* OCR：端上 PP-OCRv4（PaddleOCR）文字识别，ONNX Runtime 推理，模型与字典随包内置
-* 其他：Cloudflare 403 过盾、全局崩溃捕获、自动清理缓存（容量阈值 + 四档频率）、每日自动备份、
-  应用内检查更新（GitHub Release）、内容屏蔽（已屏蔽作者 / 帖子）
+> [!IMPORTANT]
+> 项目已开源且仅供交流和学习使用，不得用于任何商业用途。本应用是纯客户端：不内置、不转存任何内容，
+> 不上传任何用户数据，无统计 SDK；所有内容版权归属原站与各著作者。站点含成人内容：首次启动有
+> 18+ 确认，可选缩略图模糊与禁止截屏。请支持原站 Pawchive。
 
-## 2. 特性
+---
 
-* 美观整洁的界面：Miuix（HyperOS 风格）单视觉主题，全部页面走同一套抽象组件
-* 配色模式 6 态（含 Monet 动态取色）：设置中即时切换、无需重启，返回栈在切换后保留
-* 一级界面原图直出：封面默认请求原始文件（登录后全清晰度），404 自动无感回退缩略图
-* 流畅的动效：搜索框原位展开、FAB 面板、按钮变步进器、列表↔网格同元素重排动画、
-  圆形扩散全屏菜单、状态胶囊变形等 10 项规格化微交互
-* 支持多国语言：12 种语言资源（简体中文默认、繁體、英、德、西、法、印尼、日、韩、俄、土、阿拉伯整页 RTL）
-* 断点续传与离线阅读：下载重启后继续；收藏的帖子断网仍可全文检索阅读
+## 功能亮点
 
-## 3. 下载
+### 内容浏览
+- **首页信息流**：Paging 3 分页加载最新内容，关键词防抖搜索；可选「同作者仅显示一条」「隐藏已收藏创作者」；列表/网格双布局切换
+- **发现页**：9 万+ 创作者全量缓存到本地，本地搜索与 service 筛选、按更新或收藏排序、一键同步；行内点开原地展开详情面板
+- **帖子详情**：完整正文（HTML 渲染）、标签、上/下一篇、评论、修订历史、附件批量下载（按钮展开为步进器）
+- **翻译横幅**：X 风格「文A 翻译自{源语言} · 显示原文」—— 蓝色链接在译文与原文间切换，源语言按文字体系本地猜测；译文按原结构**原地替换**，段落层级与原文严格对齐
 
-[Releases](https://github.com/Aerunox/Archive/releases/latest)
+### 精准搜索
+- **关键词搜索**：帖子 / 创作者 / 离线归档三 Tab
+- **文件哈希反查**：粘贴文件哈希（MD5 / SHA-256）追踪素材出处，支持 Discord 结果
+- **离线全文搜索**：基于 Room FTS4 的中文 bigram 分词索引，断网也能搜收藏内容
+- **搜索历史**：本地持久化，保留条数可配置（5–50），支持单条删除
 
-| 文件 | 适用 |
-|---|---|
-| `Archive-<版本>-release-arm64-v8a.apk` | 主流真机（绝大多数 Android 手机） |
-| `Archive-<版本>-release-armeabi-v7a.apk` | 老 32 位 ARM 设备 |
-| `Archive-<版本>-release-x86_64.apk` | x86_64 模拟器 |
-| `Archive-<版本>-release-x86.apk` | x86 模拟器 |
-| `Archive-<版本>-release-universal.apk` | 四套 ABI 全含，兼容性最好、体积最大 |
+### 沉浸式媒体
+- **大图查看**：翻页浏览 + 双指缩放，连续滑到相邻帖子的另一种媒体
+- **视频播放**：Media3 ExoPlayer，X 风格海报格；站点未导入的视频走 HLS 临时流
+- **多级回退**：一级界面原图直出（登录后全清晰度），缺失时自动无感回退缩略图
+- **GIF / 音频**：Coil 动图与音频附件行内播放
 
-要求 **Android 11**（minSdk 30）及以上。release 包为调试签名，可直接安装、同签名覆盖升级。
+### 收藏与账号
+- **多账号切换**：账号间收藏 / 历史 / 下载数据隔离
+- **云端收藏**：登录后同步收藏的帖子与创作者，写入后即时失效缓存；离线时操作自动排队，联网后后台补写
+- **本地收藏**：无需登录，收藏即建立离线归档索引
+- **离线阅读**：收藏帖全文归档（Room FTS4），断网可检索与阅读
+- **浏览历史**：本地持久化，无需登录
 
-## 4. 构建
+### 内容订阅与通知
+- **订阅创作者**：新帖自动周期检测（间隔可调，最小 15 分钟）；可选「收藏即订阅」
+- **系统通知**：检测到新帖即时推送，可随时关闭
+- **应用内通知中心**：首页铃铛直达，未读数角标实时刷新；单条 / 全部已读，订阅管理页随时退订
 
-**要求**：Android Studio（AGP 9.4）或命令行 Gradle 9.6+，**JDK 17+（建议 21）**，
-Android SDK Platform **37**（compileSdk）与 build-tools 36.0.0。
+### 下载中心
+- **HTTP Range 断点续传**：暂停保留临时文件，应用重启后继续仍从断点续传
+- **独立任务通知**：每条任务一个通知，实时显示百分比 / 速度 / 剩余时间，通知内可暂停、继续、取消
+- **后台持续下载**：`dataSync` 前台服务保活，切后台不中断
+- **可控参数**：并发上限（1–5）、失败重试（1–3）、仅 Wi-Fi 下载、SAF 自定义目录、文件命名格式
+
+### AI 与 OCR
+- **多供应商 AI**：OpenAI Chat/Responses、Anthropic、Gemini；多模型档案与「用途指派」（翻译、识图分别指定档案）
+- **深度思考与联网搜索**开关（默认全关），连通性测试一并验证开关被端点接受
+- **端上 OCR**：PP-OCRv4（PaddleOCR）文字识别，ONNX Runtime 推理，模型与字典随包内置
+
+### 个性化设置
+- **多语言**：12 种语言资源（简体中文默认，含阿拉伯语整页 RTL），切换后杀进程仍保持
+- **外观**：配色 6 态（System/Light/Dark/Monet 三种），Monet 动态取色 + 种子色；**即时切换、无需重启**，返回栈保留
+- **隐私与安全**：模糊缩略图、禁止截屏（FLAG_SECURE）
+- **内容屏蔽**：已屏蔽作者 / 已屏蔽帖子
+- **维护**：自动清理缓存（容量阈值 + 四档频率）、每日自动备份、应用内检查更新（读取 GitHub Release）
+
+---
+
+## 技术架构
+
+| 类别 | 技术选型 | 说明 |
+|------|---------|------|
+| **语言** | Kotlin 2.3.21 | 由 AGP 9.4.1 内置，无需单独应用 Kotlin 插件 |
+| **最低 SDK** | API 30 (Android 11) | 覆盖绝大多数活跃设备 |
+| **目标 / 编译 SDK** | 36 / 37 | navigation、coil、media3 等 AAR 元数据要求 API 37 |
+| **UI 框架** | Jetpack Compose（BOM 2026.09.00） | 单一 Compose 代码库，单 Activity |
+| **设计语言** | Miuix 0.9.4（锁定） | HyperOS 风格，业务页面只依赖 `App*` 抽象组件 |
+| **模块化** | 3 个 Gradle 模块 | `app` / `data` / `core`（后两者抄自 Pawchive） |
+| **依赖注入** | Hilt + KSP | `@HiltAndroidApp` / `@HiltViewModel` |
+| **本地存储** | Room 2.8.5 + DataStore 1.2.1 | 下载 / 离线归档 FTS4 / 订阅用 Room，设置用 DataStore |
+| **下载引擎** | 自研 OkHttp 流式下载 | 单连接 + Range 断点续传（源自 Pawchive 1.7.0+） |
+| **网络层** | Retrofit 3.0.0 + OkHttp 5.5.0 | kotlinx.serialization JSON |
+| **图片加载** | Coil 3.6.3 | gif / video / network-okhttp 扩展齐备 |
+| **视频播放** | AndroidX Media3 1.11.1 | ExoPlayer + HLS + OkHttp 数据源 |
+| **OCR 推理** | ONNX Runtime 1.22.0 | Android 与 JVM 单测共用同一套模型 |
+| **后台任务** | WorkManager 2.12.0 | 周期订阅同步、自动备份、缓存清理 |
+| **构建工具** | Gradle 9.8.0 | 版本目录（`libs.versions.toml`）统一管理 |
+
+### 架构总览
+
+```mermaid
+flowchart TD
+    subgraph ui["UI 层 - Compose 单 Activity"]
+        screens["业务页面 screens"]
+        components["共享组件 components"]
+        design["App* 设计抽象"]
+        miuix["MiuixDesign - MiuixTheme"]
+    end
+
+    subgraph repo["仓库层 app-data"]
+        repos["PostRepository 等"]
+        ai["AI 翻译与识图"]
+        ocr["PP-OCRv4 OCR"]
+    end
+
+    subgraph net["网络 app-data-remote"]
+        api["PawchiveApi - Retrofit"]
+        cf["CloudflareManager 过盾"]
+        chain["UA / Session / BaseUrl 拦截器"]
+    end
+
+    subgraph store["本地存储 core + app"]
+        room[("Room - 下载 / FTS4 / 订阅")]
+        ds[("DataStore 设置")]
+    end
+
+    subgraph ops["后台 data - 抄自 Pawchive"]
+        dl["DownloadCenter 流式下载"]
+        workers["WorkManager 定时任务"]
+        notify["通知与通知中心"]
+    end
+
+    platform{{"Pawchive 平台"}}
+    user(("用户"))
+
+    user -->|"浏览操作"| screens
+    screens --> design --> miuix
+    screens --> repos
+    screens --> ocr
+    repos --> ai
+    repos --> api
+    api --> chain
+    api --> cf
+    api -->|"请求"| platform
+    repos --> room
+    repos --> ds
+    repos --> dl
+    dl --> notify
+    workers --> notify
+```
+
+---
+
+## 核心技术亮点
+
+### 1. 单一 Compose 代码库与设计系统抽象
+
+业务页面（20 个）只调用 `AppScaffold / AppTopBar / AppCard / …` 抽象组件（`ui/design/DesignComponents.kt`
+接口），由 `ArchiveTheme` 通过 CompositionLocal 注入唯一实现 `MiuixDesign`；颜色统一收敛到
+`PurrColors` 令牌：
+
+- **配色切换零重启**：模式切换 = DataStore 状态变化 → 重组，Activity 不重建，NavHostController
+  提升到主题外层，**返回栈在切换后保留**
+- **与 Miuix 官方文档逐条对齐**：`ThemeController + MiuixTheme(controller=…)` 写法、
+  Scaffold 弹窗容器约束、下拉刷新以 `MiuixScrollBehavior(canScroll = { false })` 作检测挂载点
+- **列表安全写法**：LazyColumn 内容 lambda 里对可能为空的状态一律 `firstOrNull` + `?.` + `orEmpty`
+
+### 2. Lucide 图标生成管线
+
+应用内图标统一使用 [Lucide](https://lucide.dev)（ISC 许可）：`tools/gen_lucide_icons.py` 拉取官方 SVG、
+把 24×24 描边几何逐点转换为 Compose `ImageVector`（生成文件，注释标明不要手改），与 Compose 版本
+零耦合、可随时重新生成；`LucideIconsTest` 校验每个图标的路径数据与视口。
+
+### 3. 结构保真的 AI 翻译契约
+
+帖子翻译要求「逐句对应、原地替换」，输出用**哨兵分段**（`<<<TITLE` / `<<<HTML`）而不是 JSON ——
+实测模型经常在 JSON 字符串里裸换行导致整段非法：
+
+- 解析按可靠性降级：哨兵分段 → JSON 修补 → 兜底
+- **占位照抄护栏**：模型把格式说明当译文照抄时直接报错，绝不把占位文字渲染出来
+- **假翻译检测**：译文与原文逐字符比对（忽略空白），完全相同即报错，不伪装成功
+
+### 4. Cloudflare 托管挑战自动过盾
+
+`CloudflareManager`（抄自 Pawchive）通过隐藏 WebView 执行 JS 挑战，提取 `cf_clearance` 并与其
+User-Agent 绑定注入后续 OkHttp 请求：单飞机制复用同一 `CompletableDeferred`、加密存储 25 分钟 TTL、
+403 自动刷新重试，图片加载走同一通道。
+
+### 5. 端上 OCR 管线
+
+PP-OCRv4 检测 + 识别双模型，ONNX Runtime 推理，模型与字典随包内置；同一套模型在 JVM 单测里
+跑真实推理，验证预处理 / 后处理与 PaddleOCR 官方管线对齐。
+
+### 6. 智能拦截器链
+
+- **Base URL 重写**：站点可能迁移域名，拦截器按设置即时改写 scheme/host/port，路径 `/api/v1` 不变
+- **会话注入**：手动粘贴的完整 Cookie 头按分号拆段后精确取 `session=` 段
+- **日志透明**：OkHttp BASIC 日志便于排查，release 不含明文密钥打印
+
+---
+
+## 项目结构
+
+```
+Archive/
+├── app/                    # UI 层：screens / components / design / navigation / ocr
+├── core/                   # 抄自 Pawchive：Retrofit API / 过盾 / 加密会话 / Room
+├── data/                   # 抄自 Pawchive：下载引擎 / 订阅 / 搜索历史 / 工作线程
+├── docs/                   # 架构说明 / API 验证记录 / 本地化待办 / OpenAPI 归档
+├── tools/                  # 图标生成等脚本
+└── gradle/libs.versions.toml   # 版本目录（依赖单一事实来源）
+```
+
+**依赖方向**：`:app` → `:data` / `:core`
+
+---
+
+## 快速开始
+
+### 环境要求
+- **Android Studio**（AGP 9.4）或命令行 Gradle 9.6+
+- **JDK** 17+（建议 21）
+- **Android SDK** Platform 37（compileSdk）与 build-tools 36.0.0
+
+### 克隆 & 构建
 
 ```bash
-# Android Studio：直接 Open 项目目录，Sync 后运行
-# 命令行：
-./gradlew :app:assembleDebug
-./gradlew :app:assembleRelease        # 产出多架构 release 包
-./gradlew :app:testDebugUnitTest      # 单元测试
+git clone https://github.com/Aerunox/Archive.git
+cd Archive
+./gradlew assembleRelease
 ```
 
-release 变体按 ABI 永久拆分（`splits { abi { … } }`）：四个单架构 APK + 一个 universal 包，
-产物命名 `Archive-<版本>-<buildType>-<abi|universal>.apk`，输出在 `app/build/outputs/apk/release/`。
+> APK 输出路径：`app/build/outputs/apk/release/`。release 变体按 ABI 永久拆分：
+> 四个单架构 APK（`armeabi-v7a` / `arm64-v8a` / `x86` / `x86_64`）+ 一个 universal 包，
+> 命名 `Archive-<版本>-<buildType>-<abi|universal>.apk`。
 
-## 5. 常见问题 FAQ
-
-**Q：图片只有模糊缩略图？**
-原图需要登录。站点把游客可见的文件标记为 `preview_only`，原图 URL 需要会话 Cookie；
-应用「原图优先、失败自动回退缩略图」，未登录清晰度受限但不会报错空白，下载任务始终请求原图地址。
-
-**Q：帖子评论区显示「暂无评论」？**
-站点对没有评论的帖子返回 `404`（实测，OpenAPI 未注明），应用按 Kemono 语义处理为无评论。
-若你在站点网页上看到某帖有评论而应用没有，欢迎提 issue 并附帖子链接。
-
-**Q：下拉刷新时列表不能滚动？**
-Miuix `PullToRefresh` 的既定设计：刷新动画期间消费嵌套滚动，刷新结束立即恢复。
-
-**Q：怎么换镜像站点？**
-设置 → 网络 → Base URL（默认 `https://pawchive.pw`）。所有 API 请求与文件/缩略图/头像 URL
-即时切换，无需重启。
-
-**Q：AI 翻译在哪配？**
-我 → 设置 → 帖子翻译：接口地址 / Key / 模型 / 提示词 / 采样参数，支持多档案与「用途指派」
-（翻译、识图分别指定档案）。详情页翻译横幅右侧齿轮可直达。
-
-**Q：断网还能用吗？**
-收藏的帖子建立了全文索引，离线阅读页可检索与阅读；首页/搜索/作者帖子是远程分页
-（站点无游标总数），断网时列表无法离线回放（作者库已本地缓存）。
-
-**Q：升级 Miuix 版本要注意什么？**
-上游标注实验性（API 可能变更），本仓库锁定 0.9.4 并对所用 API 逐一核对过，升级前请对照上游 changelog。
-
-## 6. 依赖版本
-
-全部版本集中在 [`gradle/libs.versions.toml`](gradle/libs.versions.toml)：
-
-| 类别 | 组件 | 版本 |
-|---|---|---|
-| 构建 | AGP / Gradle / Kotlin / KSP | 9.4.1 / 9.8.0 / 2.3.21 / 2.3.12 |
-| UI | Compose BOM（compose 1.12.1, material3 1.4.0）| 2026.09.00 |
-| 主题 | **Miuix** `top.yukonga.miuix.kmp:*`（Apache-2.0，上游标注实验阶段） | **0.9.4（锁定）** |
-| 网络 | Retrofit / OkHttp / kotlinx.serialization | 3.0.0 / 5.5.0 / 1.11.0 |
-| 图片 | Coil 3（+gif/video/network-okhttp）| 3.6.3 |
-| 本地 | Room / Paging / DataStore / WorkManager | 2.8.5 / 3.5.1 / 1.2.1 / 2.12.0 |
-| 播放 | Media3 | 1.11.1 |
-| 缩放 | zoomable（coil3 兼容）| 2.16.0 |
-| 推理 | ONNX Runtime（Android / JVM 单测）| 1.22.0 |
-
-**minSdk = 30**（Android 11），**targetSdk = 36**，**compileSdk = 37**，Java 21（core desugaring 开启）。
-AGP 9 使用内置 Kotlin（不应用 `org.jetbrains.kotlin.android`，KSP/Kotlin 编译器插件照常使用）。
-
-## 7. 架构
-
-```
-core/                <- 抄自 Pawchive（namespace com.pawchive.core）
-                     Retrofit API / Cloudflare 过盾 / 加密会话 / Room（下载·离线归档 FTS·订阅·规则）
-data/                <- 抄自 Pawchive（namespace com.pawchive.data）
-                     AuthRepository / BookmarkManager / DownloadCenter 引擎 / 订阅 / 搜索历史 / 工作线程
-app/src/main/java/com/archive/app/
-├── data/            远端(Retrofit+kotlinx.serialization) / 本地(Room+DataStore) / 仓库 / 分页 / AI
-├── di/              Hilt 模块
-├── domain/          领域模型
-├── ocr/             PP-OCRv4 管线（检测 + 识别，ONNX Runtime）
-├── ui/
-│   ├── theme/       ThemeEngine：AppThemeMode/ColorMode/MonetParams + PurrColors 令牌
-│   ├── design/      设计系统抽象层 DesignComponents
-│   │   ├── miuix/   MiuixDesign（MiuixTheme 内渲染）
-│   │   └── lucide/  LucideIcons.kt（生成文件）
-│   ├── components/  共享交互组件（搜索/面板/变形图标/翻译/播放器…）
-│   ├── navigation/  Navigation Compose（16 条路由，不依赖 miuix-nav）
-│   └── screens/     业务页面（20 个，只依赖 App* 抽象组件）
-└── util/            HTML 解析、时间格式化、模糊变换、排序与相关度
-```
-
-- **单一 Compose 代码库**：业务页面只调用 `AppScaffold / AppTopBar / AppBottomBar / AppCard / …`
-  抽象组件（`ui/design/DesignComponents.kt` 接口），由 `ArchiveTheme` 通过 CompositionLocal 注入
-  唯一实现 `MiuixDesign`；颜色统一收敛到 `PurrColors` 令牌。配色切换 = DataStore 状态变化 → 重组，
-  Activity 不重建，**返回栈在切换后保留**。
-- **顶栏策略**：带返回按钮的页面用单行紧凑顶栏；可折叠大标题只用于无返回按钮的根页面，
-  列表页不接折叠栏，避免滚动时顶栏高度变化引起反复重测量。
-- **图标体系**：应用内图标统一使用 [Lucide](https://lucide.dev)（ISC 许可）。由 `tools/gen_lucide_icons.py`
-  拉取官方 SVG、把 24×24 描边几何逐点转换为 Compose `ImageVector`（生成文件，注释标明不要手改），
-  与 Compose 版本零耦合、可随时重新生成；`LucideIconsTest` 校验每个图标的路径数据。
-- **实现与 Miuix 官方文档逐条对齐**：主题用 `ThemeController + MiuixTheme(controller=…)` 写法；
-  Scaffold 是跨平台弹窗容器，OverlayDialog 等必须被它包裹；下拉刷新以
-  `MiuixScrollBehavior(canScroll = { false })` 作为检测挂载点，只留下拉检测所需链路、不折叠顶栏。
-
-## 8. 测试
+### 常用任务
 
 ```bash
-./gradlew :app:testDebugUnitTest
+./gradlew :app:testDebugUnitTest      # 单元测试（19 个）
+./gradlew :app:compileDebugKotlin     # 快速编译检查
 ```
 
-19 个单元测试覆盖：AI 请求体与协议、翻译哨兵分段解析、HTML 解析、分页源、搜索相关度、URL 推导与链接映射、
-主题规格、更新说明解析、OCR 真实推理（同一 ONNX 模型在 JVM 上跑）、图标数据完整性等。
+### 安装
 
-## 9. 相关文档
+下载最新 APK 安装到 **Android 11+** 设备即可：[Releases](https://github.com/Aerunox/Archive/releases/latest)。
+release 包为调试签名，可直接安装、同签名覆盖升级。
 
-| 路径 | 内容 |
-|---|---|
-| `docs/ARCHITECTURE.md` | 模块职责、关键调用链、修改风险区（改动前必读） |
-| `docs/API_NOTES.md` | 站点端点与契约验证记录 |
-| `docs/I18N_BACKLOG.md` | 本地化待办 |
-| `tools/gen_lucide_icons.py` | Lucide 图标生成脚本（加图标唯一正确入口） |
+---
 
-API 数据源：全部端点经 OpenAPI spec（归档于 `docs/api/pawchive_openapi.json`）与真机请求双重验证，
-含假设证实/推翻清单，详见 [`docs/API_NOTES.md`](docs/API_NOTES.md)。
+## 权限说明
+
+| 权限 | 用途 |
+|------|------|
+| `INTERNET` | 网络请求 |
+| `ACCESS_NETWORK_STATE` | 网络状态检测（仅 Wi-Fi 下载、网络可用性判断） |
+| `POST_NOTIFICATIONS` | 下载进度通知与内容更新通知（Android 13+ 运行时申请；拒绝后浏览不受影响） |
+| `FOREGROUND_SERVICE` | 下载前台服务 |
+| `FOREGROUND_SERVICE_DATA_SYNC` | 下载前台服务类型（Android 14+ 强制声明，保证后台下载不被中断） |
+
+---
+
+## 工程质量
+
+| 机制 | 说明 |
+|------|------|
+| **单元测试** | 19 个：AI 请求体与协议、翻译哨兵解析、HTML 解析、分页源、搜索相关度、URL 推导、OCR 真实推理、图标完整性等 |
+| **R8** | release 开启混淆与资源压缩，产物按 ABI 拆分 |
+| **崩溃诊断** | 全局崩溃捕获（源自 Pawchive），落盘可导出 |
+| **语言资源** | 12 种语言；设置分类行标题已覆盖，部分业务文案仍为硬编码中文（持续补齐） |
+
+---
+
+## 相关文档
+
+| 文档 | 内容 |
+|------|------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 模块职责、关键调用链、修改风险区（改动前必读） |
+| [docs/API_NOTES.md](docs/API_NOTES.md) | 站点端点与契约验证记录 |
+| [docs/I18N_BACKLOG.md](docs/I18N_BACKLOG.md) | 本地化待办 |
+| [tools/gen_lucide_icons.py](tools/gen_lucide_icons.py) | Lucide 图标生成脚本（加图标唯一正确入口） |
+
+---
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request。提交前请确保：
+
+1. 代码风格与现有代码保持一致
+2. 页面开发只依赖 `App*` 抽象组件与 `PurrColors` 令牌，不直接引用 Miuix 类型
+3. 新增图标走 `tools/gen_lucide_icons.py`，不手改 `LucideIcons.kt`
+4. 核心逻辑改动附带单元测试
+
+---
+
+## 开源协议
+
+`core/` 与 `data/` 模块源自 [Pawchive](https://github.com/Aerunox/Pawchive)（**MIT License**）；
+本仓库其余部分尚未附带正式许可证，分发前请先与作者确认。
+
+---
+
+<p align="center">
+  <sub>图标资源来自 <a href="https://lucide.dev">Lucide</a> · 主题基于 <a href="https://github.com/miuix-kotlin-multiplatform/miuix">Miuix</a> · 数据来自 <a href="https://pawchive.pw">Pawchive</a> 平台</sub>
+</p>
