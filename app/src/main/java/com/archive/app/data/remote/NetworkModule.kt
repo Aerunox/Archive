@@ -101,7 +101,15 @@ object NetworkModule {
         .addInterceptor(session)
         .addInterceptor(baseUrl)
         .addInterceptor(
-            HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC },
+            // 与 core 的 HttpClientFactory.buildSanitizedLogger 对齐：release 不打日志，
+            // 否则列表页一次滚动几十个请求都在为 logcat 拼字符串、写字符串
+            HttpLoggingInterceptor().apply {
+                level = if (com.archive.app.BuildConfig.DEBUG) {
+                    HttpLoggingInterceptor.Level.BASIC
+                } else {
+                    HttpLoggingInterceptor.Level.NONE
+                }
+            },
         )
         .build()
 

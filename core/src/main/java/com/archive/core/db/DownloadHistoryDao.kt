@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
 import com.archive.core.model.DownloadRecord
 import com.archive.core.model.DownloadStatus
@@ -63,6 +64,16 @@ interface DownloadHistoryDao {
     /** 批量插入或覆盖记录（主键冲突时替换；ARCH-FEATURE-005 备份导入用）。 */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(records: List<DownloadRecord>)
+
+    /**
+     * 备份导入（ARCH-FEATURE-005）：清空与写回同一事务。
+     * 拆成两条语句的话，清空提交后、写入完成前进程被杀，历史会整表丢失。
+     */
+    @Transaction
+    suspend fun importAll(records: List<DownloadRecord>) {
+        clearAll()
+        insertAll(records)
+    }
 
     /**
      * 局部更新状态/进度（单条 UPDATE，不触发整表写入）。

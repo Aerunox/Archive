@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 前台下载通知（DownloadWorker setForeground；Android 13+ 运行时申请） -->
+    <!-- 前台下载通知（DownloadNotificationService；Android 13+ 运行时申请） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application>
         <!-- 下载前台服务：持有 dataSync 前台状态保活 + 承载通知栏暂停/继续/取消动作。
-             由 DownloadNotificationController 按活跃任务数启停，不对外暴露。 -->
+             由 DownloadNotificationController 按活跃任务数启停，不对外暴露。-->
         <service
             android:name="com.archive.data.download.DownloadNotificationService"
             android:exported="false"

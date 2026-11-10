@@ -311,6 +311,7 @@ class DownloadCenter @Inject constructor(
                     throw e
                 } catch (e: Exception) {
                     val progress = lastProgress.remove(record.id) ?: 0
+                    lastBytes.remove(record.id)
                     Log.e(TAG, "Download failed: record=${record.id}", e)
                     historyManager.updateStatus(
                         record.id,
@@ -366,13 +367,62 @@ class DownloadCenter @Inject constructor(
 
     /**
      * 仅 Wi-Fi 下载（FEATURE）：开启"仅 Wi-Fi 下载"且当前不在 Wi-Fi 时挂起等待，
-     * 每 30 秒轮询一次网络状态，网络就绪后继续。未开启该设置时立即返回。
+     * 网络就绪后继续。未开启该设置时立即返回。
+     *
+     * 等待用 NetworkCallback **即时唤醒**（旧实现 30s 轮询，Wi-Fi 恢复最多迟 30s
+     * 才开下）。注册的 NetworkRequest 限定 WIFI transport + INTERNET capability，
+     * 回调触发后仍以 [NetworkUtils.isOnWifi]（当前活跃网络判定）复核一次，
+     * 与轮询口径一致；系统服务拿不到时退回轮询兜底。
+     * 等待期间可被取消/暂停（挂起点抛 CancellationException 走既有处理路径）。
      */
     private suspend fun waitUntilWifiIfConfigured() {
         if (!settingsManager.isWifiOnlyDownloadEnabled()) return
         while (!com.archive.core.util.NetworkUtils.isOnWifi(context)) {
             Log.d(TAG, "Wifi-only download: waiting for Wi-Fi, record pending")
-            kotlinx.coroutines.delay(WIFI_WAIT_POLL_MS)
+            if (!awaitWifiAvailable()) {
+                // 无法注册监听（极旧 ROM / 服务异常）：退回轮询
+                kotlinx.coroutines.delay(WIFI_WAIT_POLL_MS)
+            }
+            // 回调返回后 while 条件再复核：活跃网络切换完成才放行
+        }
+    }
+
+    /**
+     * 挂起直到 Wi-Fi 网络可用（或协程被取消）。
+     * @return true = 收到 Wi-Fi 可用回调；false = 无法注册监听（调用方自行兜底）。
+     */
+    private suspend fun awaitWifiAvailable(): Boolean {
+        val cm = context.getSystemService(android.net.ConnectivityManager::class.java)
+            ?: return false
+        return kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+            val resumed = java.util.concurrent.atomic.AtomicBoolean(false)
+            var registered: android.net.ConnectivityManager.NetworkCallback? = null
+
+            fun complete() {
+                if (resumed.compareAndSet(false, true)) {
+                    registered?.let { cb -> runCatching { cm.unregisterNetworkCallback(cb) } }
+                    if (cont.isActive) cont.resumeWith(Result.success(true))
+                }
+            }
+
+            val callback = object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) {
+                    // 请求虽只注册了 WIFI transport，活跃网络切换有延迟：
+                    // 仍按 isOnWifi（活跃网络判定）复核，与旧轮询口径一致
+                    if (com.archive.core.util.NetworkUtils.isOnWifi(context)) complete()
+                }
+            }
+            registered = callback
+            cont.invokeOnCancellation {
+                runCatching { cm.unregisterNetworkCallback(callback) }
+            }
+            val request = android.net.NetworkRequest.Builder()
+                .addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+                .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+            val ok = runCatching { cm.registerNetworkCallback(request, callback) }.isSuccess
+            // 注册后兜底复查：注册前瞬间可能恰好连上 Wi-Fi（事件已错过）
+            if (!ok || com.archive.core.util.NetworkUtils.isOnWifi(context)) complete()
         }
     }
 
@@ -486,7 +536,7 @@ class DownloadCenter @Inject constructor(
      * 取消指定下载任务。
      *
      * 取消语义：协程级取消（Job.cancel）覆盖包括"临时文件→目标流写出阶段"在内的
-     * 所有执行阶段；同时取消在飞的 HTTP Call，解除阻塞中的 socket 读，
+     * 所有执行阶段；同时取消在飞 HTTP Call，解除阻塞中的 socket 读，
      * HttpDownloadManager 会将其映射为 CancellationException → 记录标 CANCELLED。
      * 不在这里提前清 activeDownloads：提前清掉去重标记会在"点了取消但协程尚未退出"
      * 的窗口期内放行同记录二次入队，第二路 RUNNING 进度会把已落盘的 COMPLETED/100
@@ -496,21 +546,42 @@ class DownloadCenter @Inject constructor(
      * 避免状态滞留；同时清除暂停标志（取消 = 放弃续传）并通知栏落终态。
      */
     fun cancel(id: String) {
-        val record = historyManager.getRecord(id) ?: return
         val job = activeJobs.remove(id)
         // 先清暂停标志再 cancel 协程：catch 路径读取不到标志才会正确标 CANCELLED
         pausedRecordIds.remove(id)
-        httpDownloadManager.cancel(record.url)
+        cancelRemoteCall(id)
         if (job == null) {
             lastProgress.remove(id)
+            lastBytes.remove(id)
             scope.launch {
+                // 内存快照可能尚未就绪（冷启动早期）：从 DB 兜底取记录发终态通知
+                val record = historyManager.getRecord(id)
+                    ?: historyManager.getRecordFromDb(id)
                 historyManager.updateStatus(id, DownloadStatus.CANCELLED)
-                notificationController.taskEnded(record.copy(status = DownloadStatus.CANCELLED))
+                record?.let {
+                    notificationController.taskEnded(it.copy(status = DownloadStatus.CANCELLED))
+                }
             }
         } else {
             job.cancel()
         }
         Log.i(TAG, "cancel: record=$id")
+    }
+
+    /**
+     * 取消在飞的 HTTP 请求并删除续传临时文件（取消 = 放弃续传）。
+     * 内存快照查不到记录时（observeAll 首次发射前的冷启动窗口）从 DB 兜底取 url，
+     * 否则 cancel/pause 在该窗口内会静默无效。
+     */
+    private fun cancelRemoteCall(id: String) {
+        val record = historyManager.getRecord(id)
+        if (record != null) {
+            httpDownloadManager.cancel(record.url)
+        } else {
+            scope.launch {
+                historyManager.getRecordFromDb(id)?.let { httpDownloadManager.cancel(it.url) }
+            }
+        }
     }
 
     /**
@@ -527,10 +598,17 @@ class DownloadCenter @Inject constructor(
             Log.w(TAG, "pause: no active job for record=$id")
             return
         }
-        val record = historyManager.getRecord(id) ?: return
         pausedRecordIds.add(id)
         job.cancel()
-        httpDownloadManager.pause(record.url)
+        // 内存快照未就绪时（冷启动窗口）从 DB 兜底取 url；同 cancelRemoteCall 的理由
+        val record = historyManager.getRecord(id)
+        if (record != null) {
+            httpDownloadManager.pause(record.url)
+        } else {
+            scope.launch {
+                historyManager.getRecordFromDb(id)?.let { httpDownloadManager.pause(it.url) }
+            }
+        }
         Log.i(TAG, "pause: record=$id")
     }
 

@@ -497,7 +497,6 @@ private fun PostsTab(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     PostCard(
                         post = post.toSummary(),
-                        preferOriginal = true,
                         isFavorite = true,
                         onFavorite = { onRemove(post) },
                         onClick = { onOpen(post) },

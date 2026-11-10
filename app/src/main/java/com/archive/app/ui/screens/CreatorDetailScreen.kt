@@ -170,8 +170,7 @@ class CreatorDetailViewModel @Inject constructor(
     val query = MutableStateFlow("")
 
     /**
-     * 关注状态 —— 即「云端收藏里有这位作者」，与收藏页「作者」标签是同一份数据。
-     *
+     * 关注状态——即「云端收藏里有这位作者」，与收藏页「作者」标签是同一份数据。
      * 作者收藏是账号数据（本地没有对应表），未登录时既没有可展示的状态也无法写入，
      * 因此 [followEnabled] 为 false、按钮置灰并提示先登录。
      */
@@ -197,7 +196,7 @@ class CreatorDetailViewModel @Inject constructor(
     private val searchTrigger = MutableStateFlow(SearchTrigger("", 0))
 
     /**
-     * 发请求只在**提交**（键盘回车/搜索键）或切换标签时发生；
+     * 发请求只在**提交**（键盘回车/搜索键）或切换标签时发生，
      * 站点限流很严，打字过程中不发请求（照 Pawchive 的提交式搜索）。
      */
     val posts: Flow<PagingData<PostSummary>> = combine(
@@ -230,8 +229,9 @@ class CreatorDetailViewModel @Inject constructor(
     private val favedIndex: StateFlow<FavedSeqIndex> = favoriteSeqRepository.index
 
     /** 已加载的帖子（按加载次序追加，切标签/换关键词时清空）——排序的数据源。
-     *  flatMapLatest 重建 Pager 后旧加载协程仍可能写同一列表，而 combine 在主线程排序遍历；
-     *  普通 MutableList 会 CME / 两批数据混合错乱，用 COW 列表保证读写一致。 */
+     *  flatMapLatest 重建 Pager 后旧加载协程仍可能写同一列表，而
+     *  combine 在主线程排序遍历，
+     *  普通 MutableList 会 CME / 两批数据混合错乱，用 COW 列表保证读写互斥。 */
     private val loadedPosts = java.util.concurrent.CopyOnWriteArrayList<PostSummary>()
     private val loadedTick = MutableStateFlow(0)
 
@@ -239,7 +239,7 @@ class CreatorDetailViewModel @Inject constructor(
      * 已加载的帖子按当前排序方式排好序（渲染用它，翻页仍由 Paging 驱动）。
      *
      * 关键词取自 [searchTrigger]（**已提交**的搜索词）：相关度排序必须有它，
-     * 否则 [PostSortMode.RELEVANCE] 只会退化成发布时间倒序 —— 表现就是「选了相关度没反应」。
+     * 否则 [PostSortMode.RELEVANCE] 只会退化成发布时间倒序——表现就是「选了相关度没反应」。
      */
     val sortedPosts: StateFlow<List<PostSummary>> =
         combine(loadedTick, sortMode, favedIndex, searchTrigger) { _, mode, faved, trigger ->
@@ -366,7 +366,7 @@ class CreatorDetailViewModel @Inject constructor(
     /**
      * 关注 / 取消关注：写云端的作者收藏（与收藏页同一个接口）。
      *
-     * 离线时由仓库进待补写队列，UI 保持乐观状态；在线失败原样上报，
+     * 离线时由仓库进待补写队列，UI 保持乐观状态；在线失败原样上报——
      * 不做「假装成功」——那会让用户以为关注上了，其实没有。
      */
     fun toggleFollow() {
@@ -397,7 +397,7 @@ class CreatorDetailViewModel @Inject constructor(
      * 保存更新提醒设置（长按关注按钮打开的小窗口）。
      *
      * 打开提醒 = 订阅该作者：提醒本来就是订阅机制产出的，没订阅就收不到新帖。
-     * 关闭提醒只把开关落库、**不删订阅行** —— 用户只是不想被打扰，并非要取消关注，
+     * 关闭提醒只把开关落库，**不删订阅行**——用户只是不想被打扰，并非要取消关注，
      * 且重新打开时不会补推关闭期间的积压帖（同步只在开着提醒时才写更新行）。
      */
     fun saveReminderSettings(notifyEnabled: Boolean, pushEnabled: Boolean) {
@@ -593,7 +593,7 @@ private fun PostsPane(
     navController: NavHostController,
 ) {
     // 回到顶部：与主页同一套组件与判定（滚过若干条目后右下角浮出，点击滚回顶部）。
-    // 顺带在回到顶部时让底部导航栏重新出现 —— 与主页的 onReachTop 行为一致。
+    // 顺带在回到顶部时让底部导航栏重新出现——与主页的 onReachTop 行为一致。
     val listState = rememberLazyListState()
     val bottomBarState = LocalBottomBarScrollState.current
     val scrollToTop = rememberListScrollToTopState(
@@ -631,7 +631,7 @@ private fun PostsPane(
             }
         }
         if (tags.isNotEmpty() && !selectionScoped) {
-            // 标签芯片底色随作者所在平台（Patreon 珊瑚橙 / Fanbox 蓝）
+            // 标签芯片底色随作者所在平台（Patreon 珊瑚色 / Fanbox 蓝）
             val brand = serviceBrandColor(viewModel.service)
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -674,7 +674,6 @@ private fun PostsPane(
                     PostCard(
                         post = post,
                         showCreator = false,
-                        preferOriginal = true,
                     ) {
                         navController.navigate(Routes.post(post.service, post.creatorId, post.postId))
                     }
@@ -776,7 +775,7 @@ private fun FancardsPane(
                 "/$h$ext"
             }
             // 粉丝卡图源三级回退（抄自 Pawchive CreatorProfileFragment）；
-            // 域名必须从 baseUrl 派生（UrlProvider），否则自定义 Base URL 时图片仍打旧域。
+            // 域名必须从 baseUrl 派生（UrlProvider），否则自定义 Base URL 时图片仍打旧域名
             val urls = listOf(
                 com.archive.app.data.remote.UrlProvider.imgBase(baseUrl).trimEnd('/') + "/data$path",
                 com.archive.app.data.remote.UrlProvider.fileBase(baseUrl).trimEnd('/') + "/data$path",
@@ -856,10 +855,9 @@ private fun LinksPane(
 }
 
 /**
- * 作者标签芯片：底色用该作者所在平台的品牌色 —— 选中是实色底 + 反差文字，
- * 未选是同色淡底 + 常规文字（淡底上仍用主题文字色，保证浅色主题下也读得清）；
- * 没有约定色的服务维持原来的中性卡片。
- */
+ * 作者标签芯片：底色用该作者所在平台的品牌色——选中是实色底 + 反差文字，
+ * 未选是同色淡底 + 常规文字（淡底上仍用主题文字色，保证浅色主题下也读得清）。
+ * 没有约定色的服务维持原来的中性卡片。 */
 @Composable
 private fun TagChip(label: String, selected: Boolean, brand: Color?, onClick: () -> Unit) {
     val colors = LocalPurrColors.current
@@ -904,9 +902,8 @@ private const val INFO_BAR_FLING_VELOCITY = 120f
  * - 反向一旦出现立即展开，列表到顶仍在下拉也展开；
  * - 惯性滑动在 [NestedScrollConnection.onPreFling] 里按速度方向一次判定，不逐帧切换。
  *
- * 与底栏的差别：信息栏收起时**真的让出高度**（列表顺势铺满），而不是平移出屏 ——
- * 这一处正是需求要的「增加内容展示空间」。
- */
+ * 与底栏的差别：信息栏收起是**真的让出高度**（列表顺势铺满），而不是平移出去——
+ * 这一处正是需求要的「增加内容展示空间」。 */
 private class CreatorInfoBarScrollState(
     val visible: MutableState<Boolean>,
     val connection: NestedScrollConnection,
@@ -929,7 +926,7 @@ private fun rememberCreatorInfoBarScrollState(): CreatorInfoBarScrollState {
                 if (source == NestedScrollSource.Fling) return Offset.Zero
                 val dy = available.y
                 if (dy < 0f) {
-                    // 手指上滑 = 往帖子深处看 → 累计到阈值后收起信息栏
+                    // 手指上滑 = 往帖子深处滚 → 累计到阈值后收起信息栏
                     accumulatedDown.floatValue += -dy
                     if (visible.value && accumulatedDown.floatValue > thresholdPx) {
                         visible.value = false
@@ -970,9 +967,8 @@ private fun rememberCreatorInfoBarScrollState(): CreatorInfoBarScrollState {
 /**
  * 作者信息栏：头像 + 名称 + 「平台 · 最新更新」+ 关注按钮。
  *
- * 不显示横幅大图（保持信息紧凑）；名称下方那一行**只留平台名与最新更新时间** ——
- * 原来还跟着平台内的公开 id，与上面的名字重复，去掉后更清爽。
- */
+ * 不显示横幅大图（保持信息紧凑）；名称下方那一行**只留平台名与最新更新时间**——
+ * 原来还跟着平台内的公开 id，与上面的名字重复，去掉后更清爽。 */
 @Composable
 private fun CreatorInfoBar(
     state: CreatorInfoBarScrollState,
@@ -1047,12 +1043,11 @@ private fun CreatorInfoBar(
  * 长按 = 打开更新提醒设置的小窗口。
  *
  * 用 [combinedClickable] 而不是在按钮上叠一层点击：同一个手势节点才能保证
- * 长按不会顺带触发单击 —— 否则「长按设提醒」会同时把关注状态也翻过来。
+ * 长按不会顺带触发单击——否则「长按设提醒」会同时把关注状态也翻过来。
  *
  * 未登录时按钮**照常可点**（不做置灰）：点下去由 ViewModel 提示「登录后才能关注」，
- * 置灰会让用户对着一个毫无反应的按钮发懵。长按设提醒同样不要求登录 ——
- * 提醒是本地订阅数据，没账号也能用。
- */
+ * 置灰会让用户对着一个毫无反应的按钮发懵。长按设提醒同样不要求登录——
+ * 提醒是本地订阅数据，没账号也能用。 */
 @Composable
 private fun FollowPill(
     following: Boolean,
@@ -1080,13 +1075,12 @@ private fun FollowPill(
  * 更新提醒小窗口（长按关注按钮打开）。
  *
  * 两个层次：
- * - 总开关「接收内容更新提醒」—— 关掉后周期同步仍推进基线，只是不再写更新行，
+ * - 总开关「接收内容更新提醒」——关掉后周期同步仍推进基线，只是不再写更新行，
  *   所以重新打开不会补推关闭期间积压的帖子；
- * - 「提醒方式」—— 只想在应用内看、不想被通知栏打扰的人可以选「仅在应用内」。
+ * - 「提醒方式」——只想在应用内看、不想被通知栏打扰的人可以选「仅在应用内」。
  *
  * 打开总开关等于订阅该作者（提醒由订阅机制产出）；若还没订阅，保存时仓库会补一行订阅，
- * 且首次同步只建立基线，不会把历史帖一次性推出来。
- */
+ * 且首次同步只建立基线，不会把历史帖一次性推出来。 */
 @Composable
 private fun ReminderDialog(
     creatorName: String,

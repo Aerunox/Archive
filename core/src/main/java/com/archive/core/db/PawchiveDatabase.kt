@@ -8,13 +8,12 @@ import com.archive.core.model.ContentUpdateEntity
 import com.archive.core.model.CreatorSubscriptionEntity
 import com.archive.core.model.DownloadRecord
 import com.archive.core.model.DownloadRuleEntity
-import com.archive.core.model.OfflineArchiveEntity
 import com.archive.core.model.PendingFavoriteActionEntity
 
 /**
  * Pawchive 本地数据库（ARCH-004：下载历史存储迁移至 Room；ARCH-005：显式 Migration；
- * ARCH-FEATURE-001：离线归档与全文搜索索引；ARCH-FEATURE-002：下载规则表；
- * ARCH-FEATURE-003：创作者订阅与内容更新通知表）。
+ * ARCH-FEATURE-001：离线归档与全文搜索索引【表已于 v9 移除，见 MIGRATION_8_9】；
+ * ARCH-FEATURE-002：下载规则表；ARCH-FEATURE-003：创作者订阅与内容更新通知表）。
  *
  * schema 变更必须提供显式 [androidx.room.migration.Migration]（见 companion），
  * 禁止回退到 fallbackToDestructiveMigration，防止本地数据丢失。
@@ -22,14 +21,12 @@ import com.archive.core.model.PendingFavoriteActionEntity
 @Database(
     entities = [
         DownloadRecord::class,
-        OfflineArchiveEntity::class,
-        OfflineArchiveFts::class,
         DownloadRuleEntity::class,
         CreatorSubscriptionEntity::class,
         ContentUpdateEntity::class,
         PendingFavoriteActionEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class PawchiveDatabase : RoomDatabase() {
@@ -37,8 +34,6 @@ abstract class PawchiveDatabase : RoomDatabase() {
     abstract fun downloadHistoryDao(): DownloadHistoryDao
 
     abstract fun pendingFavoriteActionDao(): PendingFavoriteActionDao
-
-    abstract fun offlineArchiveDao(): OfflineArchiveDao
 
     abstract fun downloadRuleDao(): DownloadRuleDao
 
@@ -214,6 +209,21 @@ abstract class PawchiveDatabase : RoomDatabase() {
                     "ALTER TABLE creator_subscriptions " +
                         "ADD COLUMN pushEnabled INTEGER NOT NULL DEFAULT 1"
                 )
+            }
+        }
+
+        /**
+         * v8 → v9（离线归档退役）：移除 offline_archives + offline_archives_fts 两张表。
+         *
+         * 这套 Room FTS4 归档从未有调用方接入——实际生效的离线归档一直是 BookmarkManager
+         * 的 DataStore 收藏全文缓存（收藏帖打开详情页时写入，全文搜索/离线阅读都走它）。
+         * 两张表自建库以来始终为空，DROP 不丢任何数据；显式迁移而非 destructive，
+         * 与本项目"禁止 destructive 回退"的约定一致。
+         */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS offline_archives_fts")
+                db.execSQL("DROP TABLE IF EXISTS offline_archives")
             }
         }
     }

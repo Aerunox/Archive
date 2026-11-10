@@ -295,8 +295,9 @@ private fun anthropicBody(
 ): JsonObject = buildJsonObject {
     put("model", model)
     put("max_tokens", settings.maxTokens)
+    // Anthropic 规定 temperature 与 top_p 互斥（同时传必 400
+    // "top_p may not be set when temperature is set"），只带 temperature。
     put("temperature", settings.temperature)
-    put("top_p", settings.topP)
     put("system", system)
     putJsonArray("messages") {
         history.forEach { message ->

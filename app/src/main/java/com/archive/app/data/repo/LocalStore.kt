@@ -7,7 +7,7 @@ import com.archive.app.data.FavoriteRecord
 import com.archive.app.data.local.AppDatabase
 import com.archive.app.data.local.FavoritePostEntity
 import com.archive.app.data.local.HistoryEntity
-import com.archive.core.db.OfflineArchiveDao
+import com.archive.data.repository.BookmarkManager
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,18 +16,20 @@ import javax.inject.Singleton
 @Singleton
 class LocalStore @Inject constructor(
     db: AppDatabase,
-    offlineArchiveDao: OfflineArchiveDao,
+    private val bookmarkManager: BookmarkManager,
 ) {
 
     private val favoriteDao = db.favoriteDao()
     private val historyDao = db.historyDao()
-    private val archiveDao = offlineArchiveDao
 
-    /** 离线归档条数（存储页统计）。 */
-    suspend fun archiveCount(): Int = archiveDao.count()
+    /**
+     * 离线归档条数（存储页统计）：来自 BookmarkManager 的收藏全文缓存。
+     * 旧的 Room offline_archives 统计（v9 已 DROP）从未有写入方，恒为 0。
+     */
+    fun archiveCount(): Int = bookmarkManager.archivedPostCount()
 
-    /** 离线归档占用字节（postJson 载荷之和，近似）。 */
-    suspend fun archiveBytes(): Long = archiveDao.getTotalBytes()
+    /** 离线归档占用字节（收藏全文 JSON 长度之和，近似）。 */
+    fun archiveBytes(): Long = bookmarkManager.archivedBytes()
 
     fun favoritePaging(): PagingSource<Int, FavoritePostEntity> = favoriteDao.observeAll()
 

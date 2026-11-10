@@ -98,29 +98,38 @@ object HtmlParser {
         return m?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
     }
 
-    fun decodeEntities(text: String): String {
-        // &amp; 必须最后解码：先解 &amp; 会把源文本里的 "&amp;lt;" 二次解码成 "<"，
-        // 显示内容被篡改（&lt;/&gt; 等先解码后，遗留的 & 序列已不可能再组成这些实体名）。
-        var out = text
-            .replace("&nbsp;", " ")
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&quot;", "\"")
-            .replace("&apos;", "'")
-            .replace("&amp;", "&")
-        // numeric character references (&#39; / &#x27; …) appear in real post bodies
-        out = NUMERIC_ENTITY.replace(out) { match ->
-            val value = if (match.groupValues[1].isNotEmpty()) {
-                match.groupValues[1].toIntOrNull()
-            } else {
-                match.groupValues[2].toIntOrNull(16)
+    /**
+     * 实体解码（单遍扫描）。
+     *
+     * 命名实体与数字字符引用放在同一个正则里交替匹配，这是正确性要求而不是风格：
+     * 顺序 replace 会把「显示为字面量的转义」二次解码——
+     * 源文本 `&amp;lt;`（应显示 "&lt;"）先解 &lt; 得 `&amp;<`、再解 &amp; 变 "&<"；
+     * `&amp;#39;`（应显示 "&#39;"）两段管线下最终变成 "'"。单遍匹配到 `&amp;` 即停，
+     * 其后的内容按普通文本保留，两类复合转义都不会被篡改。
+     */
+    fun decodeEntities(text: String): String =
+        ENTITY.replace(text) { match ->
+            when (val entity = match.value) {
+                "&nbsp;" -> " "
+                "&lt;" -> "<"
+                "&gt;" -> ">"
+                "&quot;" -> "\""
+                "&apos;" -> "'"
+                "&amp;" -> "&"
+                else -> {
+                    // 数字字符引用（&#39; / &#x27; …），真实帖子正文里出现过
+                    val body = entity.substring(2, entity.length - 1)
+                    val value = if (body[0] == 'x' || body[0] == 'X') {
+                        body.substring(1).toIntOrNull(16)
+                    } else {
+                        body.toIntOrNull()
+                    }
+                    value?.takeIf { it in 1..0x10FFFF }?.let { String(Character.toChars(it)) } ?: entity
+                }
             }
-            value?.takeIf { it in 1..0x10FFFF }?.let { String(Character.toChars(it)) } ?: match.value
         }
-        return out
-    }
 
-    private val NUMERIC_ENTITY = Regex("""&#(\d+);|&#[xX]([0-9a-fA-F]+);""")
+    private val ENTITY = Regex("&nbsp;|&lt;|&gt;|&quot;|&apos;|&amp;|&#\\d+;|&#[xX][0-9a-fA-F]+;")
 
     /**
      * HTML → 纯文本，用于列表摘要等只需要一行的场景：

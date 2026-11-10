@@ -99,6 +99,9 @@ class AiProtocolTest {
         assertEquals("2023-06-01", headers["anthropic-version"])
         assertNull(headers["Authorization"])
         assertEquals("SYS", body["system"]!!.jsonPrimitive.content)
+        // Anthropic 规定 temperature 与 top_p 互斥，同时传必 400；只允许带 temperature
+        assertNotNull(body["temperature"])
+        assertNull("top_p 不能与 temperature 同时出现", body["top_p"])
         val source = body["messages"]!!.jsonArray.last().jsonObject["content"]!!.jsonArray
             .last().jsonObject["source"]!!.jsonObject
         assertEquals("base64", source["type"]!!.jsonPrimitive.content)

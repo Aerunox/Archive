@@ -7,7 +7,6 @@ import com.archive.core.db.PendingFavoriteActionDao
 import com.archive.core.db.CreatorSubscriptionDao
 import com.archive.core.db.DownloadHistoryDao
 import com.archive.core.db.DownloadRuleDao
-import com.archive.core.db.OfflineArchiveDao
 import com.archive.core.db.PawchiveDatabase
 import dagger.Module
 import dagger.Provides
@@ -17,11 +16,10 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Room 数据库提供模块（ARCH-004；ARCH-005：显式 Migration 替代 destructive 迁移；
- * ARCH-FEATURE-001：离线归档 DAO）。
+ * Room 数据库提供模块（ARCH-004；ARCH-005：显式 Migration 替代 destructive 迁移）。
  *
  * schema 变更必须提供显式 [androidx.room.migration.Migration]（见 PawchiveDatabase），
- * 禁止回退到 fallbackToDestructiveMigration，防止下载历史/离线归档数据丢失。
+ * 禁止回退到 fallbackToDestructiveMigration，防止下载历史等本地数据丢失。
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -38,7 +36,8 @@ object DatabaseModule {
                 PawchiveDatabase.MIGRATION_4_5,
                 PawchiveDatabase.MIGRATION_5_6,
                 PawchiveDatabase.MIGRATION_6_7,
-            PawchiveDatabase.MIGRATION_7_8
+            PawchiveDatabase.MIGRATION_7_8,
+            PawchiveDatabase.MIGRATION_8_9
             )
             .build()
     }
@@ -51,11 +50,6 @@ object DatabaseModule {
     @Provides
     fun providePendingFavoriteActionDao(db: PawchiveDatabase): PendingFavoriteActionDao {
         return db.pendingFavoriteActionDao()
-    }
-
-    @Provides
-    fun provideOfflineArchiveDao(db: PawchiveDatabase): OfflineArchiveDao {
-        return db.offlineArchiveDao()
     }
 
     @Provides

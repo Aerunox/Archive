@@ -10,7 +10,7 @@
     <string name="update_ignore_version">このバージョンをスキップ</string>
     <string name="update_version_ignored">このバージョンをスキップしました。次の新バージョンで再度通知します</string>
 
-    <!-- ダウンロード通知（DownloadWorker） -->
+    <!-- ダウンロード通知（DownloadNotificationService） -->
     <string name="download_channel_name">ダウンロード進捗</string>
     <string name="download_channel_desc">通知バーにダウンロードの進捗を表示</string>
     <string name="download_notification_title_image">画像をダウンロード中</string>
