@@ -164,6 +164,9 @@ class PostDetailViewModel @Inject constructor(
     val revisions = MutableStateFlow<List<PostRevision>>(emptyList())
     val loading = MutableStateFlow(true)
 
+    /** 当前展示的是**离线归档副本**（网络加载失败时回退本地收藏全文缓存），界面出提示条。 */
+    val showingArchived = MutableStateFlow(false)
+
     /** 一次性提示（下载不可用等），由界面弹 Toast 后清空。 */
     val message = MutableStateFlow<String?>(null)
 
@@ -189,7 +192,21 @@ class PostDetailViewModel @Inject constructor(
     fun load() {
         viewModelScope.launch {
             loading.value = true
-            val result = runCatching { postRepository.detail(service, creatorId, postId) }
+            showingArchived.value = false
+            var result = runCatching { postRepository.detail(service, creatorId, postId) }
+            if (result.isFailure) {
+                // 网络加载失败（断网 / 限流 / 站点不可达）→ 回退本地收藏全文缓存离线阅读。
+                // 回退成功时把原失败吞掉：用户要的是"能看"，失败原因进 logcat 即可。
+                val archived = runCatching { archivedDetail() }.getOrNull()
+                if (archived != null) {
+                    android.util.Log.i(
+                        "PostDetail",
+                        "network load failed, showing archived copy: $service/$creatorId/$postId",
+                    )
+                    result = Result.success(archived)
+                    showingArchived.value = true
+                }
+            }
             detail.value = result
             result.getOrNull()?.let { post ->
                 // 卡片收藏时只有摘要、无法建全文索引，这里补建
@@ -219,7 +236,13 @@ class PostDetailViewModel @Inject constructor(
                     ),
                 )
             }
-            // 失败不与"0 条评论"混同：置错误标记，评论区显示加载失败（原因进 logcat 可查）
+            // 首屏只等详情正文：评论区独立加载，不拖住 loading。
+            // comments 端点一旦被 Cloudflare 拦截，403 兜底拦截器过盾最坏要 30s——
+            // 串行时这 30s 里整个详情页都在白屏转圈。
+            loading.value = false
+        }
+        // 评论区独立协程：有自己的 commentsError 状态位与占位 UI，慢/失败只影响评论区
+        viewModelScope.launch {
             runCatching {
                 postRepository.comments(service, creatorId, postId)
             }.onSuccess { comments.value = it }
@@ -227,7 +250,6 @@ class PostDetailViewModel @Inject constructor(
                     android.util.Log.w("PostDetail", "评论加载失败 $service/$creatorId/$postId", e)
                     commentsError.value = true
                 }
-            loading.value = false
         }
         // 作者显示名（本地作者库 → 内存缓存 → 线上兜底）与订阅状态
         viewModelScope.launch {
@@ -242,6 +264,35 @@ class PostDetailViewModel @Inject constructor(
                 com.archive.core.api.ApiClient.publicApi.getPostRevisions(service, creatorId, postId)
             }.getOrDefault(emptyList())
         }
+    }
+
+    /**
+     * 本地收藏全文缓存（BookmarkManager 的 DataStore post_object JSON）→ 离线阅读用的
+     * PostDetail。与在线详情同构：正文/附件/上下篇齐全；标签缓存里没有，置空表即可
+     * （离线场景下 UI 对空标签不渲染区块）。缓存不存在（未收藏或从未打开过详情）返回 null。
+     */
+    private fun archivedDetail(): PostDetail? {
+        val post = bookmarkManager.getBookmarkedPost(service, creatorId, postId) ?: return null
+        return PostDetail(
+            service = post.service,
+            creatorId = post.user,
+            postId = post.id,
+            title = post.title?.ifBlank { null } ?: "(无标题)",
+            contentHtml = post.content ?: "",
+            added = post.added,
+            published = post.published,
+            edited = post.edited,
+            file = post.file?.let {
+                com.archive.app.domain.Attachment(it.name, it.path, it.previewOnly ?: false)
+            },
+            attachments = post.attachments.orEmpty().map {
+                com.archive.app.domain.Attachment(it.name, it.path, it.previewOnly ?: false)
+            },
+            tags = emptyList(),
+            prev = post.prev,
+            next = post.next,
+            previewOnly = post.file?.previewOnly ?: false,
+        )
     }
 
     /**
@@ -332,6 +383,7 @@ fun PostDetailScreen(
     val creatorName by viewModel.creatorName.collectAsStateWithLifecycle()
     val isSubscribed by viewModel.isSubscribed.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val showingArchived by viewModel.showingArchived.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // 下载不可用等一次性提示
@@ -386,6 +438,7 @@ fun PostDetailScreen(
                     post = post,
                     creatorName = creatorName,
                     isSubscribed = isSubscribed,
+                    showingArchived = showingArchived,
                     onToggleSubscribe = viewModel::toggleSubscribe,
                     onDownloadAll = { viewModel.downloadAllImages(post) },
                     comments = comments,
@@ -421,6 +474,7 @@ private fun DetailContent(
     post: PostDetail,
     creatorName: String?,
     isSubscribed: Boolean,
+    showingArchived: Boolean,
     onToggleSubscribe: () -> Unit,
     onDownloadAll: () -> Unit,
     comments: List<PostComment>,
@@ -498,6 +552,30 @@ private fun DetailContent(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(top = topPadding, bottom = 24.dp),
     ) {
+        // ── 离线归档提示条：网络加载失败、正文来自本地收藏全文缓存时明确告知 ──
+        if (showingArchived) {
+            item(key = "archived-banner") {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = LucideIcons.folder,
+                        contentDescription = null,
+                        tint = colors.textTertiary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    AppText(
+                        "网络加载失败，当前显示离线归档副本（可能不是最新）",
+                        style = AppTextStyle.SMALL,
+                        color = colors.textTertiary,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+            }
+        }
         // ── 作者头部（X 的帖子详情顶部：大头像 + 名字 + @handle + 关注按钮）──
         item {
             Row(

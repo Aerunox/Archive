@@ -115,9 +115,13 @@ class HomeViewModel @Inject constructor(
     private val favedIndex: StateFlow<FavedSeqIndex> = favoriteSeqRepository.index
 
     /** 已加载的帖子（按加载次序追加，刷新时清空）——排序的数据源。
-     *  写方（Paging 的 map，可能在后台协程）与读方（combine 里排序遍历）并发，
-     *  普通 MutableList 会 ConcurrentModificationException / 读到中间态，用 COW 列表保证一致性。 */
-    private val loadedPosts = java.util.concurrent.CopyOnWriteArrayList<PostSummary>()
+     *  写方（Paging 的 map，可能在后台协程）与读方（combine 里排序遍历）并发：
+     *  同一把锁保护的可变列表 + 读侧取快照。此前用 CopyOnWriteArrayList——每次
+     *  append 都复制整个底层数组，列表越长一页的写放大越大（500 条时每条复制
+     *  ~4KB、一页 50 条白拷 200KB）；普通列表加锁是 O(1) 摊还写入，安全性等价。 */
+    private val postsLock = Any()
+    private val loadedPosts = ArrayList<PostSummary>()
+    private fun snapshotPosts(): List<PostSummary> = synchronized(postsLock) { loadedPosts.toList() }
     private val loadedTick = MutableStateFlow(0)
 
     /** 首页信息流选项（Pawchive 对齐）：同作者仅显示一条 / 隐藏已收藏创作者。 */
@@ -125,7 +129,7 @@ class HomeViewModel @Inject constructor(
         .recentPager()
         .cachedIn(viewModelScope)
         .map { pagingData ->
-            loadedPosts.clear()
+            synchronized(postsLock) { loadedPosts.clear() }
             loadedTick.value++
             val hideBookmarked = settingsManager.isHideBookmarkedCreatorsEnabled()
             val dedupe = settingsManager.isDedupeByCreatorEnabled()
@@ -143,7 +147,7 @@ class HomeViewModel @Inject constructor(
                 }
                 // Paging 负责加载与预取；这里把加载出来的条目录下来，交给排序后的列表渲染
                 .map { post ->
-                    loadedPosts += post
+                    synchronized(postsLock) { loadedPosts += post }
                     loadedTick.value++
                     post
                 }
@@ -152,15 +156,17 @@ class HomeViewModel @Inject constructor(
     /** 已加载的首页内容按当前排序方式排好序的结果（渲染用它，翻页仍由 Paging 驱动）。 */
     val sortedPosts: StateFlow<List<PostSummary>> =
         combine(loadedTick, sortMode, favedIndex) { _, mode, faved ->
-            loadedPosts.sortedFor(mode, favedSeq = faved)
+            snapshotPosts().sortedFor(mode, favedSeq = faved)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val query = MutableStateFlow("")
     val currentQuery: StateFlow<String> = query
 
     /** 站内搜索的已加载结果（同样支持排序；相关度需要关键词，所以排序时带上 query）。
-     *  同 loadedPosts：Paging 写与 combine 读并发，需 COW 列表。 */
-    private val loadedSearch = java.util.concurrent.CopyOnWriteArrayList<PostSummary>()
+     *  同 loadedPosts：锁保护列表 + 读侧快照（写方与 combine 读方并发）。 */
+    private val searchLock = Any()
+    private val loadedSearch = ArrayList<PostSummary>()
+    private fun snapshotSearch(): List<PostSummary> = synchronized(searchLock) { loadedSearch.toList() }
     private val searchTick = MutableStateFlow(0)
 
     val searchResults: Flow<PagingData<PostSummary>> = query
@@ -170,10 +176,10 @@ class HomeViewModel @Inject constructor(
             postRepository.globalSearchPager(q.trim())
                 .cachedIn(viewModelScope)
                 .map { pagingData ->
-                    loadedSearch.clear()
+                    synchronized(searchLock) { loadedSearch.clear() }
                     searchTick.value++
                     pagingData.map { post ->
-                        loadedSearch += post
+                        synchronized(searchLock) { loadedSearch += post }
                         searchTick.value++
                         post
                     }
@@ -182,7 +188,7 @@ class HomeViewModel @Inject constructor(
 
     val sortedSearchResults: StateFlow<List<PostSummary>> =
         combine(searchTick, sortMode, favedIndex, query) { _, mode, faved, q ->
-            loadedSearch.sortedFor(mode, q, faved)
+            snapshotSearch().sortedFor(mode, q, faved)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun onQueryChange(value: String) {
@@ -425,7 +431,6 @@ private fun PostsGridOrList(
                 PostCard(
                     post = post,
                     compact = isGrid,
-                    preferOriginal = true,
                     onOpenCreator = { onOpenCreator(post) },
                 ) { onOpen(post) }
             }

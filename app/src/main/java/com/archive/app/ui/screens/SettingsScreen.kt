@@ -811,7 +811,8 @@ fun SettingsScreen(
         TextFieldDialog(
             show = editBaseUrl,
             title = "Base URL",
-            hint = "站点域名变更时可修改，默认 https://pawchive.pw",
+            hint = "站点域名变更时可修改，默认 https://pawchive.pw。仅 API 与媒体地址跟随此设置；" +
+                "Cloudflare 过盾、哈希反查与订阅仍走 pawchive.pw",
             initial = settings.baseUrl,
             onDismiss = { editBaseUrl = false },
             onSave = {

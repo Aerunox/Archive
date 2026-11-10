@@ -10,7 +10,7 @@
     <string name="update_ignore_version">忽略此版本</string>
     <string name="update_version_ignored">已忽略该版本，可在后续版本发布时再提示</string>
 
-    <!-- 下载通知（DownloadWorker） -->
+    <!-- 下载通知（DownloadNotificationService） -->
     <string name="download_channel_name">下载进度</string>
     <string name="download_channel_desc">在通知栏显示下载进度</string>
     <string name="download_notification_title_image">正在下载图片</string>

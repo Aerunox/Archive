@@ -45,10 +45,10 @@ class DownloadNotificationController @Inject constructor(
     companion object {
         private const val TAG = "DownloadNotif"
 
-        /** 与 DownloadWorker 的通知渠道共用同一 ID，避免设置页出现两个重复渠道。 */
+        /** 通知渠道 ID（沿用旧 DownloadWorker 时代的取值，避免升级后设置页出现重复渠道）。 */
         private const val CHANNEL_ID = "pawchive_download"
 
-        /** 前台服务常驻通知（汇总条目）。避开 DownloadWorker 使用的 1001。 */
+        /** 前台服务常驻通知（汇总条目），与 [DownloadNotificationService] 的 startForeground 一致。 */
         private const val SUMMARY_NOTIFICATION_ID = 2001
 
         /** 单条通知的最小更新间隔（毫秒）。系统对通知更新有频率限制，自律节流。 */

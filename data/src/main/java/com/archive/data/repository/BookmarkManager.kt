@@ -180,6 +180,23 @@ class BookmarkManager @Inject constructor(
         }
     }
 
+    /**
+     * 离线归档条数：已建立全文缓存的收藏帖数量（post_object 键数，
+     * 与 [getBookmarkedPosts] 同源；存储页统计用，不解析 JSON）。
+     */
+    fun archivedPostCount(): Int {
+        ensureLoaded()
+        return cache.asMap().keys.count { it.name.startsWith("post_object_") }
+    }
+
+    /** 离线归档占用字节（post_object JSON 原文长度之和，近似值；存储页统计用）。 */
+    fun archivedBytes(): Long {
+        ensureLoaded()
+        return cache.asMap()
+            .filterKeys { it.name.startsWith("post_object_") }
+            .values.sumOf { (it as? String)?.length?.toLong() ?: 0L }
+    }
+
     fun bookmarkCreator(service: String, creatorId: String) {
         ensureLoaded()
         editSync { it[getCreatorKey(service, creatorId)] = true }

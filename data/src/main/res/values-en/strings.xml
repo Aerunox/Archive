@@ -10,7 +10,7 @@
     <string name="update_ignore_version">Skip this version</string>
     <string name="update_version_ignored">Version skipped. You will be prompted again when a newer version is released</string>
 
-    <!-- Download notification (DownloadWorker) -->
+    <!-- Download notification (DownloadNotificationService) -->
     <string name="download_channel_name">Download progress</string>
     <string name="download_channel_desc">Shows download progress in the notification bar</string>
     <string name="download_notification_title_image">Downloading image</string>

@@ -148,12 +148,12 @@ class CreatorSubscriptionRepository @Inject constructor(
      *
      * 备份里的 lastPostId 一并恢复，避免导入后首次同步把订阅基线之前的历史帖
      * 全部当成"新帖"推送通知；未提供基线的条目置 null（首次同步只初始化基线不通知）。
+     * 清空与写回在同一 Room 事务里完成（中断不会留下空库）。
      */
     suspend fun importAll(refs: List<CreatorSubscriptionRef>) {
-        subscriptionDao.clearAll()
         val now = System.currentTimeMillis()
-        refs.forEach { ref ->
-            subscriptionDao.upsert(
+        subscriptionDao.importAll(
+            refs.map { ref ->
                 CreatorSubscriptionEntity(
                     service = ref.service,
                     creatorId = ref.creatorId,
@@ -163,8 +163,8 @@ class CreatorSubscriptionRepository @Inject constructor(
                     notifyEnabled = ref.notifyEnabled,
                     pushEnabled = ref.pushEnabled,
                 )
-            )
-        }
+            }
+        )
     }
 
     suspend fun markRead(id: Long) = updateDao.markRead(id)
@@ -260,9 +260,11 @@ class CreatorSubscriptionRepository @Inject constructor(
             }
         }
 
-        // 推进基线（即使无新帖，也保证后续同步从最新帖开始）
+        // 推进基线（即使无新帖，也保证后续同步从最新帖开始）。
+        // 用定向 UPDATE 只改 lastPostId：同步开始后用户才改的提醒开关不能被
+        // 同步启动时的整行快照回滚（copy + upsert 会连 notifyEnabled 一起覆盖回去）。
         if (newestPostId != null && newestPostId != baseline) {
-            subscriptionDao.upsert(subscription.copy(lastPostId = newestPostId))
+            subscriptionDao.updateLastPostId(subscription.service, subscription.creatorId, newestPostId)
         }
         return newUpdates
     }

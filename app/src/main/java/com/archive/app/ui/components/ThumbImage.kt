@@ -45,6 +45,7 @@ fun ThumbImage(
 ) {
     val blur = blurredOverride ?: LocalBlurThumbnails.current
     val context = LocalContext.current
+    val colors = com.archive.app.ui.theme.LocalPurrColors.current
     // 模糊开启时（默认）：原图那点分辨率会被模糊抹掉，直接用缩略图 ——
     // 省掉一次大图下载 + 大图解码 + 大图模糊，这是信息流滚动卡顿的主要来源。
     // 用户点开看清（blur = false）时仍按原来的逻辑取原图。
@@ -71,6 +72,11 @@ fun ThumbImage(
         contentDescription = contentDescription,
         modifier = modifier.clip(RoundedCornerShape(cornerRadius.dp)),
         contentScale = ContentScale.Crop,
+        // 加载占位：给个中性容器色，避免列表快速滚动时封面区域一片空白——
+        // 占位色让"正在加载"可预期，感知上比空白位快
+        placeholder = androidx.compose.runtime.remember(colors) {
+            androidx.compose.ui.graphics.painter.ColorPainter(colors.surfaceContainer)
+        },
         onError = {
             if (originalUrl != null && !originalFailed) originalFailed = true
         },

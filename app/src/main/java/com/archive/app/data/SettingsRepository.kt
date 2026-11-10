@@ -10,9 +10,13 @@ import com.archive.app.data.remote.UrlProvider
 import com.archive.app.ui.theme.AppColorMode
 import com.archive.app.ui.theme.AppMonetStyle
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -51,6 +55,29 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val AGE_CONFIRMED = booleanPreferencesKey("age_confirmed")
     }
 
+    /**
+     * [baseUrlOnce] / [sessionCookieOnce] 的内存快照（OkHttp 拦截器热路径读）。
+     *
+     * 此前每请求都 runBlocking 读 DataStore（挂起/调度/事件循环各来一遍），
+     * 列表页几十个请求的纯税。快照策略：
+     * - 首次读取（快照未就绪）仍同步读一次 DataStore——冷启动第一请求的行为与旧实现一致，
+     *   不会拿默认域名/空 cookie 发出去；
+     * - 之后常驻内存零开销；本 init 里的 collector 与各 set* 写入方负责刷新。
+     */
+    @Volatile private var baseUrlSnapshot: String? = null
+    @Volatile private var sessionCookieSnapshot: String? = null
+
+    init {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching {
+                settings.collect { p ->
+                    baseUrlSnapshot = p.baseUrl
+                    sessionCookieSnapshot = p.sessionCookie
+                }
+            }
+        }
+    }
+
     val settings: Flow<AppSettings> = context.settingsDataStore.data.map { p ->
         val defaults = AppSettings()
         AppSettings(
@@ -76,19 +103,39 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
      */
     val loaded: Flow<Boolean> = settings.map { true }
 
-    /** Blocking read for OkHttp interceptors (network thread). */
-    fun baseUrlOnce(): String = runCatching { kotlinx.coroutines.runBlocking { settings.first().baseUrl } }
-        .getOrDefault(UrlProvider.DEFAULT_BASE_URL)
+    /** 拦截器热路径读（内存快照；首读同步落一次盘，见快照注释）。 */
+    fun baseUrlOnce(): String {
+        baseUrlSnapshot?.let { return it }
+        val value = runCatching { kotlinx.coroutines.runBlocking { settings.first().baseUrl } }
+            .getOrDefault(UrlProvider.DEFAULT_BASE_URL)
+        baseUrlSnapshot = value
+        return value
+    }
 
-    fun sessionCookieOnce(): String = runCatching {
-        kotlinx.coroutines.runBlocking { settings.first().sessionCookie }
-    }.getOrDefault("")
+    fun sessionCookieOnce(): String {
+        sessionCookieSnapshot?.let { return it }
+        val value = runCatching {
+            kotlinx.coroutines.runBlocking { settings.first().sessionCookie }
+        }.getOrDefault("")
+        sessionCookieSnapshot = value
+        return value
+    }
 
     suspend fun setColorMode(value: AppColorMode) = edit { it[Keys.COLOR_MODE] = value.name }
     suspend fun setMonetStyle(value: AppMonetStyle) = edit { it[Keys.MONET_STYLE] = value.name }
     suspend fun setSeedColor(value: Long) = edit { it[Keys.SEED_COLOR] = value }
-    suspend fun setBaseUrl(value: String) = edit { it[Keys.BASE_URL] = value.trim() }
-    suspend fun setSessionCookie(value: String) = edit { it[Keys.SESSION_COOKIE] = value.trim() }
+    suspend fun setBaseUrl(value: String) {
+        val trimmed = value.trim()
+        edit { it[Keys.BASE_URL] = trimmed }
+        // 写入方同步刷新快照：改完立即生效，不等 collector 的下一帧
+        baseUrlSnapshot = trimmed.ifBlank { UrlProvider.DEFAULT_BASE_URL }
+    }
+
+    suspend fun setSessionCookie(value: String) {
+        val trimmed = value.trim()
+        edit { it[Keys.SESSION_COOKIE] = trimmed }
+        sessionCookieSnapshot = trimmed
+    }
     suspend fun setBlurThumbnails(value: Boolean) = edit { it[Keys.BLUR_THUMBNAILS] = value }
     suspend fun setFlagSecure(value: Boolean) = edit { it[Keys.FLAG_SECURE] = value }
     suspend fun setAgeConfirmed(value: Boolean) = edit { it[Keys.AGE_CONFIRMED] = value }
