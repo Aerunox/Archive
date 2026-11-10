@@ -296,9 +296,9 @@ release 包为调试签名，可直接安装、同签名覆盖升级。
 
 ## 开源协议
 
-本项目以 [Unlicense](https://unlicense.org)（公共领域）发布——任何人可以任意使用、修改、分发、商用，无需署名、无需保留声明。
+本项目以 [MIT License](LICENSE) 发布——任何人可以自由使用、修改、分发、商用，只需在副本中保留版权与许可声明。
 
-`core/` 与 `data/` 模块源自 [Pawchive](https://github.com/Aerunox/Pawchive)（MIT License，同一作者），已一并转为 Unlicense 发布。第三方依赖各自遵循其原始许可（详见对应项目）。
+`core/` 与 `data/` 模块源自 [Pawchive](https://github.com/Aerunox/Pawchive)（MIT License，同一作者）。第三方依赖各自遵循其原始许可（详见对应项目）。
 
 ---
 
