@@ -140,6 +140,34 @@ private fun FileDto.toAttachment(): Attachment = Attachment(
     tempExpires = tempExpires?.takeIf { it.isNotBlank() },
 )
 
+/**
+ * 离线归档（BookmarkManager 收藏全文缓存）里的 core `Post` → 列表摘要。
+ * 「离线归档」搜索 Tab 的结果卡片用；与 PostDto 的 [PostDto.toSummary] 同形但数据源不同
+ * （core 模型没有 substring，摘要直接从正文 HTML 提取）。
+ */
+fun com.archive.core.model.Post.toSummary(): com.archive.app.domain.PostSummary {
+    val cover = file?.let { f ->
+        f.path?.takeIf { it.isNotBlank() }?.let { path ->
+            com.archive.app.domain.Attachment(f.name, path)
+        }
+    } ?: attachments.orEmpty()
+        .firstOrNull { !it.path.isNullOrBlank() }
+        ?.let { com.archive.app.domain.Attachment(it.name, it.path!!) }
+    return com.archive.app.domain.PostSummary(
+        service = service,
+        creatorId = user,
+        postId = id,
+        title = title?.ifBlank { null } ?: "(无标题)",
+        excerpt = content
+            ?.let { com.archive.app.util.HtmlParser.htmlToPlainText(it) }
+            ?.takeIf { it.isNotBlank() }
+            ?.take(160),
+        published = published,
+        cover = cover,
+        previewOnly = file?.previewOnly ?: false,
+    )
+}
+
 fun com.archive.core.model.FileSearchPost.toSummaryForSearch(): com.archive.app.domain.PostSummary? {
     val pid = id.takeIf { it.isNotBlank() } ?: return null
     return com.archive.app.domain.PostSummary(

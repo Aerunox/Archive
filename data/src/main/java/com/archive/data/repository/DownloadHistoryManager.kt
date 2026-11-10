@@ -161,12 +161,12 @@ class DownloadHistoryManager @Inject constructor(
 
     /**
      * 批量导入下载历史（ARCH-FEATURE-005 备份恢复）。
-     * 先清空现有记录再批量写入（主键冲突覆盖），保持与备份一致。
+     * 先清空现有记录再批量写入（主键冲突覆盖），保持与备份一致；
+     * 清空与写入在同一 Room 事务里，中断不会丢历史。
      */
     suspend fun importAll(records: List<DownloadRecord>) {
         if (records.isEmpty()) return
-        dao.clearAll()
-        dao.insertAll(records)
+        dao.importAll(records)
     }
 
     /**
@@ -182,6 +182,12 @@ class DownloadHistoryManager @Inject constructor(
     fun getRecord(id: String): DownloadRecord? {
         return _records.value.find { it.id == id }
     }
+
+    /**
+     * 从数据库直接读取记录。内存快照（observeAll 首次发射）就绪前的短暂窗口里
+     * [getRecord] 会查不到，DownloadCenter.cancel/pause 用它兜底取 url。
+     */
+    suspend fun getRecordFromDb(id: String): DownloadRecord? = dao.getById(id)
 
     /**
      * 按去重指纹查询进行中任务（ARCH-005 去重）。

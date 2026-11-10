@@ -37,13 +37,29 @@ class PostRepository @Inject constructor(private val api: PawchiveApi) {
     var lastDetail: PostDetail? = null
         private set
 
+    /**
+     * 分页配置（对齐推特 / JHenTai 的「适量加载」策略）：
+     * - **initialLoadSize = 一页**：Paging 默认首屏拉 3×pageSize（150 条），首屏即三倍流量；
+     * - **prefetchDistance = 8**：距末尾约一屏内才请求下一页，一次一页——
+     *   旧值 25 会在离底部还很远时就预取整页，表现为"无止境的后台加载"；
+     * - **enablePlaceholders = false**：不做占位条目（占位会让列表提前按预估总数布局，
+     *   且与排序后的渲染列表对不上）。
+     * 服务端无总数接口，短页（<50）即终点，由 PostPagingSource 结束分页。
+     */
+    private fun pagingConfig(): PagingConfig = PagingConfig(
+        pageSize = PostPagingSource.PAGE_SIZE,
+        initialLoadSize = PostPagingSource.PAGE_SIZE,
+        prefetchDistance = 8,
+        enablePlaceholders = false,
+    )
+
     private fun pager(loader: suspend (Int) -> List<com.archive.app.data.remote.PostDto>): Flow<PagingData<PostSummary>> =
-        Pager(PagingConfig(pageSize = PostPagingSource.PAGE_SIZE, prefetchDistance = 25)) {
+        Pager(pagingConfig()) {
             PostPagingSource(loader)
         }.flow
 
     fun recentPager(): Flow<PagingData<PostSummary>> =
-        Pager(PagingConfig(pageSize = PostPagingSource.PAGE_SIZE, prefetchDistance = 25)) {
+        Pager(pagingConfig()) {
             recentSource()
         }.flow
 
@@ -71,7 +87,7 @@ class PostRepository @Inject constructor(private val api: PawchiveApi) {
     }
 
     fun globalSearchPager(query: String): Flow<PagingData<PostSummary>> =
-        Pager(PagingConfig(pageSize = PostPagingSource.PAGE_SIZE, prefetchDistance = 25)) {
+        Pager(pagingConfig()) {
             globalSearchSource(query)
         }.flow
 
@@ -81,7 +97,7 @@ class PostRepository @Inject constructor(private val api: PawchiveApi) {
         query: String?,
         tag: String?,
     ): Flow<PagingData<PostSummary>> =
-        Pager(PagingConfig(pageSize = PostPagingSource.PAGE_SIZE, prefetchDistance = 25)) {
+        Pager(pagingConfig()) {
             creatorPostsSource(service, creatorId, query, tag)
         }.flow
 

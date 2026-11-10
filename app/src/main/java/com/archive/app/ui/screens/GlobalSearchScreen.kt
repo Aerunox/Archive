@@ -21,10 +21,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
+import com.archive.data.repository.BookmarkManager
 import com.archive.data.repository.SearchHistoryManager
 import com.archive.app.data.local.CreatorEntity
 import com.archive.app.data.repo.CreatorRepository
 import com.archive.app.data.repo.PostRepository
+import com.archive.app.data.toSummary
 import com.archive.app.domain.DiscordHit
 import com.archive.app.domain.PostSummary
 import com.archive.app.ui.LocalAppSettings
@@ -55,10 +57,12 @@ import com.archive.app.ui.components.PostSortMenu
 import com.archive.app.ui.components.isPostSelectionActive
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 搜索页（行为对照 Pawchive 的 SearchViewModel / SearchFragment）：
@@ -69,6 +73,8 @@ import kotlinx.coroutines.launch
  *   结果含站点帖子与 Discord 帖子。
  * - 创作者搜索匹配**名称或 ID**；纯数字（≥3 位）或 pixiv 主页链接里的用户 id 视为精确 pid，
  *   命中的创作者排到最前。
+ * - 「离线归档」Tab 在**本地**收藏全文缓存（打开过详情页的收藏帖）里做包含匹配，
+ *   断网也能搜。
  */
 @HiltViewModel
 class SearchViewModel @Inject constructor(
@@ -76,9 +82,10 @@ class SearchViewModel @Inject constructor(
     private val creatorRepository: CreatorRepository,
     private val searchHistoryManager: SearchHistoryManager,
     private val favoriteSeqRepository: FavoriteSeqRepository,
+    private val bookmarkManager: BookmarkManager,
 ) : ViewModel() {
 
-    enum class Tab { POSTS, CREATORS }
+    enum class Tab { POSTS, CREATORS, ARCHIVE }
 
     /** 创作者排序（对照 Pawchive 的 CreatorSortOption，另加相关度）。 */
     enum class CreatorSort(val label: String) {
@@ -92,6 +99,8 @@ class SearchViewModel @Inject constructor(
         val tab: Tab = Tab.POSTS,
         val postResults: List<PostSummary> = emptyList(),
         val discordHits: List<DiscordHit> = emptyList(),
+        /** 离线归档 Tab 的本地全文缓存匹配结果。 */
+        val archiveResults: List<PostSummary> = emptyList(),
         val creatorResults: List<CreatorEntity> = emptyList(),
         val loading: Boolean = false,
         val error: String? = null,
@@ -131,6 +140,7 @@ class SearchViewModel @Inject constructor(
 
     /** 最近一次搜索的原始结果（未排序），切换排序时重新计算。 */
     private var rawPosts: List<PostSummary> = emptyList()
+    private var rawArchive: List<PostSummary> = emptyList()
     private var rawCreators: List<CreatorEntity> = emptyList()
 
     /** 云端收藏序号索引（「按收藏时间排序」用）。 */
@@ -141,9 +151,10 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch {
             favoriteSeqRepository.index.collect { index ->
                 favedIndex = index
-                if (rawPosts.isNotEmpty()) {
+                if (rawPosts.isNotEmpty() || rawArchive.isNotEmpty()) {
                     _state.value = _state.value.copy(
                         postResults = sortPosts(rawPosts, _state.value.postSort, _state.value.postResultsQuery),
+                        archiveResults = sortPosts(rawArchive, _state.value.postSort, _state.value.postResultsQuery),
                     )
                 }
             }
@@ -156,6 +167,7 @@ class SearchViewModel @Inject constructor(
         _state.value = _state.value.copy(
             postSort = sort,
             postResults = sortPosts(rawPosts, sort, _state.value.postResultsQuery),
+            archiveResults = sortPosts(rawArchive, sort, _state.value.postResultsQuery),
         )
     }
 
@@ -229,6 +241,7 @@ class SearchViewModel @Inject constructor(
             _state.value = _state.value.copy(
                 postResults = emptyList(),
                 discordHits = emptyList(),
+                archiveResults = emptyList(),
                 creatorResults = emptyList(),
                 loading = false,
                 error = null,
@@ -276,6 +289,7 @@ class SearchViewModel @Inject constructor(
             when (_state.value.tab) {
                 Tab.POSTS -> runPostsSearch(query)
                 Tab.CREATORS -> filterCreators(query, finishLoading = true)
+                Tab.ARCHIVE -> runArchiveSearch(query)
             }
         }
     }
@@ -340,6 +354,42 @@ class SearchViewModel @Inject constructor(
                     loading = false,
                     error = friendlyError(error),
                     hint = "搜索失败",
+                )
+            }
+    }
+
+    /**
+     * 离线归档搜索：在本地收藏全文缓存（BookmarkManager 的 DataStore post_object JSON）
+     * 里做包含匹配，纯本地、断网可用。缓存读取会现场解析全部收藏的完整 JSON，
+     * 放到 Default 线程池执行，避免几百条收藏时卡主线程。
+     */
+    private suspend fun runArchiveSearch(query: String) {
+        val outcome = runSearch {
+            withContext(Dispatchers.Default) {
+                bookmarkManager.searchBookmarkedPosts(query).map { it.toSummary() }
+            }
+        }
+        if (lastSubmittedQuery != query) return
+        outcome
+            .onSuccess { posts ->
+                rawArchive = posts
+                _state.value = _state.value.copy(
+                    archiveResults = sortPosts(rawArchive, _state.value.postSort, query),
+                    loading = false,
+                    hashMode = false,
+                    postResultsQuery = query,
+                    hint = if (posts.isEmpty()) {
+                        "本地归档没有匹配内容\n（收藏帖在打开过详情页后才有全文缓存）"
+                    } else {
+                        null
+                    },
+                )
+            }
+            .onFailure { error ->
+                _state.value = _state.value.copy(
+                    loading = false,
+                    error = friendlyError(error),
+                    hint = "本地归档搜索失败",
                 )
             }
     }
@@ -520,7 +570,7 @@ fun GlobalSearchScreen(
                 }
 
                 AppTabRow(
-                    tabs = listOf("帖子", "创作者"),
+                    tabs = listOf("帖子", "创作者", "离线归档"),
                     selected = state.tab.ordinal,
                     modifier = Modifier.padding(top = 4.dp),
                 ) { index -> viewModel.onTabSelected(SearchViewModel.Tab.entries[index]) }
@@ -539,6 +589,18 @@ fun GlobalSearchScreen(
                             note = "排序作用于本次搜索返回的结果；「收藏时间」需登录后才有云端收藏序号",
                         )
                     }
+                    SearchViewModel.Tab.ARCHIVE -> Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        PostSortMenu(
+                            current = state.postSort,
+                            onSelect = viewModel::setPostSort,
+                            note = "排序作用于本次搜索返回的结果",
+                        )
+                    }
                     SearchViewModel.Tab.CREATORS -> SortChips(
                         options = SearchViewModel.CreatorSort.entries.map { it.label },
                         selected = state.creatorSort.ordinal,
@@ -547,8 +609,9 @@ fun GlobalSearchScreen(
 
                 // 帖子只在提交时请求：改了输入但还没按搜索时，列表仍是上一次关键词的结果。
                 // 明确标出「这批结果对应哪个词」，否则会让人以为它们匹配当前输入。
+                // （离线归档 Tab 同为提交式搜索，一并适用。）
                 val currentQuery = state.query.trim()
-                if (state.tab == SearchViewModel.Tab.POSTS &&
+                if (state.tab != SearchViewModel.Tab.CREATORS &&
                     state.postResultsQuery.isNotBlank() &&
                     currentQuery != state.postResultsQuery
                 ) {
@@ -575,11 +638,12 @@ fun GlobalSearchScreen(
                     onRetry = { viewModel.submit(state.query) },
                 )
                 state.query.isBlank() -> AppEmptyState(
-                    "输入关键词开始搜索\n· 帖子 / 创作者关键词（≥3 字符）\n· 文件哈希反查：MD5 / SHA-256",
+                    "输入关键词开始搜索\n· 帖子 / 创作者关键词（≥3 字符）\n· 文件哈希反查：MD5 / SHA-256\n· 离线归档：在收藏过的帖子全文里搜索",
                 )
                 else -> when (state.tab) {
                     SearchViewModel.Tab.POSTS -> PostsResults(state, navController)
                     SearchViewModel.Tab.CREATORS -> CreatorsResults(state, settings.baseUrl, navController)
+                    SearchViewModel.Tab.ARCHIVE -> ArchiveResults(state, navController)
                     }
             }
         }
@@ -625,6 +689,30 @@ private fun PostsResults(state: SearchViewModel.UiState, navController: NavHostC
                     },
                     onClick = null,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArchiveResults(state: SearchViewModel.UiState, navController: NavHostController) {
+    LazyColumn(
+        Modifier.fillMaxSize().appListModifier(),
+        contentPadding = PaddingValues(bottom = 24.dp),
+    ) {
+        if (state.archiveResults.isEmpty()) {
+            item { AppEmptyState(state.hint ?: "本地归档没有匹配内容") }
+        }
+        items(
+            state.archiveResults.size,
+            key = { i ->
+                val p = state.archiveResults[i]
+                "archive-" + p.service + "/" + p.creatorId + "/" + p.postId + "#" + i
+            },
+        ) { i ->
+            val post = state.archiveResults[i]
+            PostCard(post = post) {
+                navController.navigate(Routes.post(post.service, post.creatorId, post.postId))
             }
         }
     }

@@ -79,4 +79,12 @@ class HtmlParserTest {
         assertEquals("A'b", HtmlParser.htmlToPlainText("A&#39;b"))
         assertEquals("A'b", HtmlParser.htmlToPlainText("A&#x27;b"))
     }
+
+    @Test
+    fun `escaped literals are decoded exactly once`() {
+        // 源文本 &amp;lt; 显示为字面量 "&lt;"，不能再往下解成 "<"
+        assertEquals("&lt;", HtmlParser.htmlToPlainText("&amp;lt;"))
+        // &amp;#39; 显示为字面量 "&#39;"，不能变成 "'"
+        assertEquals("&#39;", HtmlParser.htmlToPlainText("&amp;#39;"))
+    }
 }

@@ -7,7 +7,7 @@ plugins {
 }
 
 /** 版本号单点定义：`defaultConfig` 与 APK 文件名都用它，避免两处漂移。 */
-val appVersionName = "1.0.1"
+val appVersionName = "1.0.2"
 
 android {
     namespace = "com.archive.app"
@@ -18,7 +18,7 @@ android {
         applicationId = "com.archive.app"
         minSdk = 30
         targetSdk = 36
-        versionCode = 2
+        versionCode = 3
         versionName = appVersionName
     }
 
