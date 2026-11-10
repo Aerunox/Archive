@@ -260,7 +260,18 @@ fun HomeScreen(
                         enter = fadeIn() + expandHorizontally(),
                         exit = fadeOut() + shrinkHorizontally(),
                     ) {
-                        AppText("Archive", style = AppTextStyle.TITLE)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AppText("Archive", style = AppTextStyle.TITLE)
+                            // 排序入口跟标题同行（右侧图标区已满，放标题后最省竖向空间）。
+                            // 只作用于**已加载**的内容（站点接口没有排序参数）；站内搜索结果同样按它排列。
+                            // 搜索展开时随标题一起让位，避免和搜索框抢宽度。
+                            PostSortMenu(
+                                current = sortMode,
+                                onSelect = viewModel::onSortChange,
+                                note = "排序作用于已加载的帖子；「收藏时间」需登录后才有云端收藏序号",
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
                     }
                     // 展开搜索时撤掉这个占位，把整行剩余宽度让给搜索框
                     if (!searchActive) {
@@ -314,22 +325,6 @@ fun HomeScreen(
                 }
 
                 val searching = searchActive && query.trim().length >= 3
-                // 排序：只作用于**已加载**的内容（站点接口没有排序参数）；站内搜索的结果同样按它排列。
-                // 多选期间收起：它不在多选条底下，留着就是纯粹的可误触控件（退出多选自动回来）
-                AnimatedVisibility(visible = !selectionScoped) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        PostSortMenu(
-                            current = sortMode,
-                            onSelect = viewModel::onSortChange,
-                            note = "排序作用于已加载的帖子；「收藏时间」需登录后才有云端收藏序号",
-                        )
-                    }
-                }
                 if (searching) {
                     val results = viewModel.searchResults.collectAsLazyPagingItems()
                     PostsGridOrList(
