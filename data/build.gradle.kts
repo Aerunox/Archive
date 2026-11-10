@@ -52,7 +52,7 @@ dependencies {
     api("com.google.code.gson:gson:2.10.1")
 
     // SAF DocumentFile - CacheRepository / DownloadRepository 目录操作
-    implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("androidx.documentfile:documentfile:1.1.0")
 
     // Coil 2 - AppCacheCleaner/CacheRepository 统计与清理图片缓存（与 app 层 Coil3 共存）
     implementation("io.coil-kt:coil:2.6.0")

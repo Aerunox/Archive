@@ -148,7 +148,7 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":data"))
     implementation("com.google.code.gson:gson:2.10.1")
-    implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("androidx.documentfile:documentfile:1.1.0")
 
     implementation(libs.retrofit)
     implementation(libs.retrofit.kotlinx.serialization)
