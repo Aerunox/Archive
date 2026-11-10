@@ -60,8 +60,8 @@ dependencies {
     // Hilt
     implementation("com.google.dagger:hilt-android:2.60.1")
     ksp("com.google.dagger:hilt-compiler:2.60.1")
-    implementation("androidx.hilt:hilt-work:1.3.0")
-    ksp("androidx.hilt:hilt-compiler:1.3.0")
+    implementation("androidx.hilt:hilt-work:1.4.0")
+    ksp("androidx.hilt:hilt-compiler:1.4.0")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
