@@ -43,7 +43,7 @@ jobs:
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Upload APKs as workflow artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: apk-${{ github.ref_name }}
           path: app/build/outputs/apk/release/*.apk
