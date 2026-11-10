@@ -296,9 +296,9 @@ release 包为调试签名，可直接安装、同签名覆盖升级。
 
 ## 开源协议
 
-本项目以 [MIT License](LICENSE) 发布——任何人可以自由使用、修改、分发、商用，只需在副本中保留版权与许可声明。
+本项目以 [GNU GPL-3.0](LICENSE)（GNU 通用公共许可证第 3 版）发布。**传染性 Copyleft**：任何基于本项目的修改版或衍生作品（包括修改后重新分发的 APK），都必须以 GPL-3.0 公开完整对应源码，不得闭源。
 
-`core/` 与 `data/` 模块源自 [Pawchive](https://github.com/Aerunox/Pawchive)（MIT License，同一作者）。第三方依赖各自遵循其原始许可（详见对应项目）。
+`core/` 与 `data/` 模块源自 [Pawchive](https://github.com/Aerunox/Pawchive)（MIT License，同一作者，已随本项目转为 GPL-3.0）。第三方依赖各自遵循其原始许可（Apache-2.0 / MIT / BSD 等，均与 GPL-3.0 兼容）。
 
 ---
 
