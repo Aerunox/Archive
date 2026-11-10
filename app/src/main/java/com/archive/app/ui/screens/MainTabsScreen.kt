@@ -85,6 +85,9 @@ fun MainTabsScreen(navController: NavHostController) {
                     // 与 ViewPager2 的 offscreenPageLimit = 1 对齐：相邻页保持组合，切换即时
                     beyondViewportPageCount = 1,
                     key = { labels[it] },
+                    // 首尾页（首页 / 我）越过边界时彻底不动：默认的 overscroll 拉伸
+                    // 会让页面跟着手指晃一下，看起来像还能再滑出一页
+                    overscrollEffect = null,
                 ) { page ->
                     // 页面是否处于前台：页面内据此实现「每次进入自动刷新」
                     CompositionLocalProvider(

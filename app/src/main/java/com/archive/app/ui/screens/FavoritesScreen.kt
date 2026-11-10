@@ -1,10 +1,8 @@
 package com.archive.app.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -332,7 +330,32 @@ fun FavoritesScreen(
     val creatorsScrollToTop = rememberListScrollToTopState(creatorsListState, onReachTop = { bottomBarState?.show() })
     AppScaffold(
         topBar = {
-            AppTopBar(title = "收藏")
+            // 排序入口放在标题行右侧：与「收藏」同行，省掉一整行竖向空间。
+            // 只影响展示顺序（云端「加载更多」拿到的仍是接口顺序）；
+            // 多选期间收起：它就在顶栏操作位上，留着纯是误触源（退出多选自动回来）。
+            AppTopBar(title = "收藏") {
+                if (loggedIn && !selectionScoped) {
+                    if (tab == 0) {
+                        PostSortMenu(
+                            current = sortMode,
+                            onSelect = viewModel::setSortMode,
+                            // 收藏页没有搜索关键词，「相关度」没有意义，不列出来
+                            hiddenModes = setOf(PostSortMode.RELEVANCE),
+                            note = "排序作用于已加载的收藏；「收藏时间」用的是云端收藏序号",
+                            modifier = Modifier.padding(end = 12.dp),
+                        )
+                    } else {
+                        CreatorSortMenu(
+                            current = creatorSortMode,
+                            onSelect = viewModel::setCreatorSort,
+                            // 收藏作者列表没有搜索关键词，「相关度」在这里无从计算
+                            hiddenModes = setOf(CreatorSortMode.RELEVANCE),
+                            note = "排序作用于已加载的收藏作者",
+                            modifier = Modifier.padding(end = 12.dp),
+                        )
+                    }
+                }
+            }
         },
     ) { padding ->
         Box(Modifier.fillMaxSize()) {
@@ -364,35 +387,6 @@ fun FavoritesScreen(
                 selected = tab,
                 modifier = Modifier.padding(top = 4.dp),
             ) { tab = it }
-
-            // 排序：只影响展示顺序（云端「加载更多」拿到的仍是接口顺序）。
-            // 多选期间收起：它不在多选条底下，留着就是纯粹的可误触控件（退出多选自动回来）
-            AnimatedVisibility(visible = !selectionScoped) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    if (tab == 0) {
-                        PostSortMenu(
-                            current = sortMode,
-                            onSelect = viewModel::setSortMode,
-                            // 收藏页没有搜索关键词，「相关度」没有意义，不列出来
-                            hiddenModes = setOf(PostSortMode.RELEVANCE),
-                            note = "排序作用于已加载的收藏；「收藏时间」用的是云端收藏序号",
-                        )
-                    } else {
-                        CreatorSortMenu(
-                            current = creatorSortMode,
-                            onSelect = viewModel::setCreatorSort,
-                            // 收藏作者列表没有搜索关键词，「相关度」在这里无从计算
-                            hiddenModes = setOf(CreatorSortMode.RELEVANCE),
-                            note = "排序作用于已加载的收藏作者",
-                        )
-                    }
-                }
-            }
 
             AppPullToRefresh(
                 isRefreshing = if (tab == 0) postsState.loading else creatorsState.loading,
