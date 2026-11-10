@@ -15,6 +15,7 @@
   <img src="https://img.shields.io/badge/Kotlin-2.3.21-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/API-30%2B-34A853?style=for-the-badge&logo=android&logoColor=white" alt="Min API" />
   <img src="https://img.shields.io/badge/Target_API-36-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Target API" />
+  <a href="https://t.me/Pawchive_Archive"><img src="https://img.shields.io/badge/Telegram-%E9%A2%91%E9%81%93-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram 频道" /></a>
 </p>
 
 > [!IMPORTANT]
