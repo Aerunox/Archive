@@ -33,7 +33,7 @@ dependencies {
     // Retrofit & Networking（抄自 Pawchive core 模块）
     api("com.squareup.retrofit2:retrofit:3.0.0")
     api("com.squareup.retrofit2:converter-gson:3.0.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:5.5.1")
 
     // Security - EncryptedSharedPreferences（SessionManager 多账号加密存储）
     api("androidx.security:security-crypto:1.1.0-alpha06")

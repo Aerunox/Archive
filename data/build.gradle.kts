@@ -37,7 +37,7 @@ dependencies {
     // Retrofit - AuthRepository 直接解析 Response/ResponseBody
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:5.5.1")
 
     // WorkManager - @HiltWorker 下载/缓存任务
     implementation("androidx.work:work-runtime-ktx:2.12.0")
