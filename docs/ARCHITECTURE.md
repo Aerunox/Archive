@@ -84,7 +84,5 @@
 
 ## 5. 遗留/未知项
 
-- `tools_remove_lg.py`：一次性脚本（移除 LiquidGlass 主题），对当前构建无影响
 - `docs/api/pawchive_openapi.json`：站点 API 契约快照（与 PawchiveApi.kt 对照）
 - 未逐行阅读：绝大多数 Screen 的完整实现、ui/components、ui/design、部分 util（HtmlParser/PostSort 等）、core/util 若干工具——涉及具体页面修改时需再读对应文件
-- AppMemoryCache（core/store，与 api/ApiMemoryCache 不同的一个类）职责未核实
