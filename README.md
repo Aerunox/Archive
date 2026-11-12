@@ -307,8 +307,6 @@ release 包为调试签名，可直接安装、同签名覆盖升级。
   </a>
 </p>
 
-图表由 [Star History](https://star-history.dera.page/how-to-use) 实时渲染（`<picture>` 会自动跟随 GitHub 明暗主题）。仓库转为公开后即可正常出图。
-
 ---
 
 ## 开源协议
