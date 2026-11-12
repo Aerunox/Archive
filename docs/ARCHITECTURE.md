@@ -35,7 +35,7 @@
 | 订阅/通知 | `repository/CreatorSubscriptionRepository.kt` + `work/ContentUpdateWorker.kt`、`ContentUpdateNotifier.kt` | 周期同步新帖（间隔≥15 分钟，默认 30）【已确认】 |
 | 下载规则 | `repository/DownloadRuleEngine.kt`、`DownloadRuleRepository.kt` | 规则化自动下载【已确认】 |
 | 备份 | `repository/BackupManager.kt` | JSON bundle schema v1；导出收藏/屏蔽/订阅/进度/下载历史/部分设置；会话 Cookie 与搜索历史永不导出；导入覆盖式【已确认】 |
-| 更新检查 | `github/UpdateChecker.kt` | GithubApi；STABLE/BETA 通道；语义化版本比较；「忽略此版本」；24h/7d/每次启动【已确认】 |
+| 更新检查 | `github/UpdateChecker.kt`、`api/GithubReleaseFeed.kt` | GithubApi（api.github.com，匿名配额 60 次/小时/IP）；**API 403/429 或异常时自动降级到网页端点** `releases.atom`（`GithubWebApi` + `GithubReleaseFeed`，不计配额，只给 tag/时间/落地页、无更新说明），「更新记录」同样兜底；STABLE/BETA 通道；语义化版本比较；「忽略此版本」；启动命中新版本即唤起系统浏览器到该版本 release 页（同一版本只跳一次，之后仅 Toast + 浮层）；限流时界面报「GitHub 限流了，稍后再试」而非「检查更新失败」；24h/7d/每次启动【已确认】 |
 | Worker | `work/FavoriteActionsSyncWorker.kt`、`CacheCleanWorker.kt`、`AutoBackupWorker.kt`、`work/ContentUpdateWorker.kt` | 收藏离线补写、缓存阈值清理、每日自动备份、订阅同步（2026-11-09 删除了无调用方的 DownloadWorker 遗留死代码）【已确认】 |
 | 其他 | `repository/BlockedCreatorManager.kt`、`SearchHistoryManager.kt`、`ReadingProgressManager.kt`、`LocalDataCleaner.kt`、`CacheRepository.kt`、`CreatorNameCache.kt`、`SimilarCreatorsRepository.kt`、`download/DownloadNotificationController.kt`、`DownloadFeedback.kt` 等 | 屏蔽名单、搜索历史、阅读进度、清数据、缓存管理、昵称缓存【已确认】 |
 
@@ -62,7 +62,7 @@
 3. **收藏**：`FavoriteActions.toggle` → LocalStore（Room，列表状态）→ BookmarkManager（DataStore；有完整 Post 时写全文缓存）→ 已登录时云端写（离线进 pending_favorite_actions 队列，`FavoriteActionsSyncWorker` 联网补写）→ 收藏即订阅（设置开启）。卡片收藏时只有摘要，全文缓存在打开详情页时由 `FavoriteActions.ensureArchived` 补建；详情页网络加载失败时回退 `BookmarkManager.getBookmarkedPost` 离线阅读（PostDetailViewModel.archivedDetail）。
 4. **AI 翻译/识图**：`TranslationClient.translatePost` / `VisionClient.summarize|ask` → `TranslationSettings.forPurpose` 取档案 → `AiProtocol.buildRequest`（按 apiType 拼体/鉴权头）→ `callAi`（独立 OkHttp）→ `parseReply` 解正文/推理/检索信号。
 5. **内容更新**：`ContentUpdateWorker`（周期 ≥15min）→ 订阅表 → 拉新帖 → content_updates → 通知。
-6. **更新检查**：`UpdateChecker` → GitHub releases/latest（STABLE）或全量（BETA）→ semver → 弹窗（Markdown→HTML）。
+6. **更新检查**：`UpdateChecker` → GitHub releases/latest（STABLE）或全量（BETA）→ semver → 启动时 `ArchiveRoot` 唤起系统浏览器到 `downloadUrl`（= release.htmlUrl，BETA 也指向真实命中的发布；为空则退到 `GithubRepo.RELEASES_URL`）+ 弹 Toast + 全屏浮层兜底；同一版本只自动跳一次（`UpdateChecker.claimBrowserOpen` 以 DataStore 里的 browser_opened_version 记账），手动检查走「关于」页（Markdown→HTML）。**任一 GitHub API 调用抛 HttpException 403/429 或异常时，改读 `https://github.com/<owner>/<repo>/releases.atom`（`GithubWebApi.releasesAtom` → `GithubReleaseFeed.parse`，不计 API 配额；STABLE 通道按 tag 后缀 `-` 过滤预发布），兜底成功则正常给结论，只有两条路都拿不到才报 `UpdateResult.Error`（`rateLimited` 标记区分限流与真故障）。仓库坐标（owner/name/主页 URL/atom URL）统一取自 `core/.../api/GithubApi.kt` 的 `object GithubRepo`，改仓库只改这一处。
 
 ## 4. 修改风险区（改动前对照）
 

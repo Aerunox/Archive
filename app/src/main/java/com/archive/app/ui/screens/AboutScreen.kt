@@ -53,6 +53,7 @@ import com.archive.app.ui.design.AppTopBar
 import com.archive.app.ui.design.lucide.LucideIcons
 import com.archive.app.ui.theme.LocalPurrColors
 import com.archive.app.util.Fmt
+import com.archive.core.api.GithubRepo
 import com.archive.core.store.SettingsManager
 import com.archive.data.github.UpdateChecker
 import com.archive.data.github.UpdateReleaseInfo
@@ -83,7 +84,14 @@ class AboutViewModel @Inject constructor(
         data object Checking : UpdateUiState
         data object UpToDate : UpdateUiState
         data object NoReleases : UpdateUiState
-        data object Failed : UpdateUiState
+
+        /**
+         * 没查成。
+         *
+         * [rateLimited] 区分「被 GitHub 限流」与「网络/服务端问题」：
+         * 前者是等一会儿就能好的事，报成「失败」只会让用户以为应用坏了。
+         */
+        data class Failed(val rateLimited: Boolean = false) : UpdateUiState
 
         data class Available(
             val latestVersion: String,
@@ -396,6 +404,30 @@ fun AboutScreen(
                     modifier = Modifier.padding(horizontal = 20.dp),
                 )
             }
+            // 仓库入口：源码、发布页与问题反馈都在这里，统一从 GithubRepo.URL 取地址
+            item {
+                AppListItem(
+                    title = "GitHub 仓库",
+                    summary = GithubRepo.URL.removePrefix("https://") + " · 源码与问题反馈",
+                    start = {
+                        Icon(
+                            imageVector = LucideIcons.link,
+                            contentDescription = null,
+                            tint = colors.textSecondary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    },
+                    end = {
+                        Icon(
+                            imageVector = LucideIcons.externalLink,
+                            contentDescription = null,
+                            tint = colors.textTertiary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    onClick = { openUrl(context, GithubRepo.URL) },
+                )
+            }
         }
 
         // 弹窗必须写在 AppScaffold **内部**：Miuix 的 OverlayDialog 依赖 Scaffold 提供的
@@ -437,7 +469,8 @@ fun AboutScreen(
 }
 
 /** 检查结果 → 界面状态（手动检查与启动自动检查的结论共用同一条映射）。 */
-private fun UpdateResult?.toUiState(): AboutViewModel.UpdateUiState = when (this) {    null -> AboutViewModel.UpdateUiState.Idle
+private fun UpdateResult?.toUiState(): AboutViewModel.UpdateUiState = when (this) {
+    null -> AboutViewModel.UpdateUiState.Idle
     is UpdateResult.UpdateAvailable -> AboutViewModel.UpdateUiState.Available(
         latestVersion = latestVersion,
         publishedAt = publishedAt,
@@ -446,7 +479,7 @@ private fun UpdateResult?.toUiState(): AboutViewModel.UpdateUiState = when (this
     )
     UpdateResult.UpToDate -> AboutViewModel.UpdateUiState.UpToDate
     UpdateResult.NoReleases -> AboutViewModel.UpdateUiState.NoReleases
-    UpdateResult.Error -> AboutViewModel.UpdateUiState.Failed
+    is UpdateResult.Error -> AboutViewModel.UpdateUiState.Failed(rateLimited = rateLimited)
 }
 
 /** 总览标题：一眼看出当前处于什么状态。 */
@@ -456,7 +489,8 @@ private fun statusTitle(state: AboutViewModel.UpdateUiState): String = when (sta
     AboutViewModel.UpdateUiState.Checking -> "正在检查更新…"
     AboutViewModel.UpdateUiState.UpToDate -> "你使用的是最新版本"
     AboutViewModel.UpdateUiState.NoReleases -> "仓库还没有发布版本"
-    AboutViewModel.UpdateUiState.Failed -> "检查更新失败"
+    is AboutViewModel.UpdateUiState.Failed ->
+        if (state.rateLimited) "GitHub 限流了，稍后再试" else "检查更新失败"
     is AboutViewModel.UpdateUiState.Available -> "发现新版本 ${state.latestVersion}"
 }
 

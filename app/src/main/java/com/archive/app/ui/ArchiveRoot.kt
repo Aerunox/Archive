@@ -204,7 +204,35 @@ fun ArchiveRoot(appViewModel: AppViewModel = hiltViewModel()) {
         val result = runCatching {
             updateChecker.autoCheck(com.archive.app.BuildConfig.VERSION_NAME)
         }.getOrNull()
-        if (result is com.archive.data.github.UpdateResult.UpdateAvailable) updatePrompt.value = result
+        if (result is com.archive.data.github.UpdateResult.UpdateAvailable) {
+            updatePrompt.value = result
+            // latestVersion 是 release.tagName 原样（常已带 v，如 "v1.0.3"），
+            // 先去掉前缀再统一补一个 v，避免出现 "vv1.0.3"。
+            val versionLabel = "v" + result.latestVersion.removePrefix("v")
+
+            // 主路径：直接把用户送到**能点下载的网页**——该版本的 release 页
+            // （downloadUrl = release.htmlUrl，页面上就是它自己的 APK 附件）。
+            // 拿不到单条发布地址时退到仓库的 releases 列表页，仍能点到 apk。
+            // 同一版本只自动跳一次：否则每次冷启动都把人从应用里拽出去，
+            // 用户已经看过、只是暂时不想装的时候尤其难受；跳过一次之后
+            // 就只留下面的 toast 与浮层，主动权交回用户。
+            val target = result.downloadUrl.ifBlank { com.archive.core.api.GithubRepo.RELEASES_URL }
+            val jumpToBrowser = updateChecker.claimBrowserOpen(result.latestVersion)
+            if (jumpToBrowser) {
+                com.archive.app.ui.components.openUrl(context, target)
+            }
+
+            // 轻量提示：浏览器是另一个窗口，用户返回应用时未必记得刚才发生了什么；
+            // 另外「同版本只跳一次」之后就不会再有跳转了，这条 toast 是那时唯一的提示。
+            // 用 LONG 是因为版本号+一句话在 SHORT 里容易被读漏；toast 是系统窗口，
+            // 与下面那层自绘浮层不冲突。
+            val hint = if (jumpToBrowser) {
+                "发现新版本 " + versionLabel + "，已为你打开下载页，返回后可在此应用内继续查看"
+            } else {
+                "发现新版本 " + versionLabel + "，可在「关于」页或浏览器下载页查看更新"
+            }
+            android.widget.Toast.makeText(context, hint, android.widget.Toast.LENGTH_LONG).show()
+        }
     }
 
     // Android 13+ 需要运行时申请通知权限：下载进度通知（通知栏进度条）依赖它。
