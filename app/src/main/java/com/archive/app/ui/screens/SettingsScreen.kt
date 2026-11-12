@@ -193,13 +193,14 @@ class SettingsViewModel @Inject constructor(
     fun checkAppUpdate(onResult: (String) -> Unit) {
         viewModelScope.launch {
             val result = runCatching { updateChecker.check(BuildConfig.VERSION_NAME) }
-                .getOrElse { com.archive.data.github.UpdateResult.Error }
+                .getOrElse { com.archive.data.github.UpdateResult.Error(detail = it.javaClass.simpleName) }
             onResult(
                 when (result) {
                     is com.archive.data.github.UpdateResult.UpdateAvailable -> "发现新版本 ${result.latestVersion}，请到 GitHub 下载"
                     com.archive.data.github.UpdateResult.UpToDate -> "已是最新版本"
                     com.archive.data.github.UpdateResult.NoReleases -> "仓库还没有发布版本"
-                    com.archive.data.github.UpdateResult.Error -> "检查更新失败"
+                    is com.archive.data.github.UpdateResult.Error ->
+                        if (result.rateLimited) "GitHub 限流了，稍后再试" else "检查更新失败"
                 },
             )
         }
