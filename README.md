@@ -5,7 +5,7 @@
 <h1 align="center">Archive</h1>
 
 <p align="center">
-  一款精致、流畅的第三方 Android 客户端，为你带来 <a href="https://pawchive.pw">Pawchive</a> 平台的完整体验。<br/>
+  一款精致、流畅的第三方 Android 客户端（非官方，与 Pawchive 官方无隶属关系），为你带来 <a href="https://pawchive.pw">Pawchive</a> 平台的完整体验。<br/>
   基于 Kemono 的内容归档站：聚合 Patreon、Fanbox 等平台的创作者内容，支持浏览、搜索、收藏、下载与端上 OCR。<br/>
   采用 Miuix（HyperOS 风格）的 Jetpack Compose 单视觉主题。
 </p>
@@ -22,6 +22,13 @@
 > 项目已开源且仅供交流和学习使用，不得用于任何商业用途。本应用是纯客户端：不内置、不转存任何内容，
 > 不上传任何用户数据，无统计 SDK；所有内容版权归属原站与各著作者。站点含成人内容：首次启动有
 > 18+ 确认，可选缩略图模糊与禁止截屏。请支持原站 Pawchive。
+
+> [!NOTE]
+> **非官方声明**：本项目是 [Pawchive](https://pawchive.pw) 平台的**非官方**第三方 Android 客户端，由社区开发者
+> 独立开发与维护，与 Pawchive 官方及其运营团队**不存在任何隶属、合作、赞助或授权关系**；项目名称、图标、界面与
+> 代码均属本项目自有，不代表官方立场。应用内展示的所有内容、账号与数据均经由 Pawchive 公开接口读取，本项目不参与
+> 内容生产与审核，也不内置、不转存任何内容。站点服务条款、内容治理与账号事务一律以 [pawchive.pw](https://pawchive.pw)
+> 官方说明为准；本仓库只负责客户端自身的缺陷与改进建议。
 
 ---
 
@@ -298,11 +305,11 @@ release 包为调试签名，可直接安装、同签名覆盖升级。
 ## Star 趋势
 
 <p align="center">
-  <a href="https://star-history.dera.page/#Aerunox/Archive&Date">
+  <a href="https://star-history.com/#Aerunox/Archive&Date">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=Aerunox/Archive&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=Aerunox/Archive&type=Date" />
-      <img alt="Star History Chart" src="https://star-history.dera.page/svg?repos=Aerunox/Archive&type=Date" width="760" />
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Aerunox/Archive&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Aerunox/Archive&type=Date" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Aerunox/Archive&type=Date" width="760" />
     </picture>
   </a>
 </p>
@@ -315,8 +322,10 @@ release 包为调试签名，可直接安装、同签名覆盖升级。
 
 `core/` 与 `data/` 模块源自 [Pawchive](https://github.com/Aerunox/Pawchive)（MIT License，同一作者，已随本项目转为 GPL-3.0）。第三方依赖各自遵循其原始许可（Apache-2.0 / MIT / BSD 等，均与 GPL-3.0 兼容）。
 
+本项目为独立的第三方非官方客户端，未取得 Pawchive 官方的授权、赞助或背书；Pawchive 名称与相关标识归其各自权利人所有。
+
 ---
 
 <p align="center">
-  <sub>图标资源来自 <a href="https://lucide.dev">Lucide</a> · 主题基于 <a href="https://github.com/miuix-kotlin-multiplatform/miuix">Miuix</a> · 数据来自 <a href="https://pawchive.pw">Pawchive</a> 平台</sub>
+  <sub>图标资源来自 <a href="https://lucide.dev">Lucide</a> · 主题基于 <a href="https://github.com/miuix-kotlin-multiplatform/miuix">Miuix</a> · 数据来自 <a href="https://pawchive.pw">Pawchive</a> 平台（本项目为非官方客户端）</sub>
 </p>
