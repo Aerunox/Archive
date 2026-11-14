@@ -7,7 +7,9 @@
 <p align="center">
   一款精致、流畅的第三方 Android 客户端（非官方，与 Pawchive 官方无隶属关系），为你带来 <a href="https://pawchive.pw">Pawchive</a> 平台的完整体验。<br/>
   基于 Kemono 的内容归档站：聚合 Patreon、Fanbox 等平台的创作者内容，支持浏览、搜索、收藏、下载与端上 OCR。<br/>
-  采用 Miuix（HyperOS 风格）的 Jetpack Compose 单视觉主题。
+  采用 Miuix（HyperOS 风格）的 Jetpack Compose 单视觉主题。<br/>
+  本项目以 <b>功能丰富</b> 为核心：AI 翻译、端上 OCR、12 语言、动态取色一应俱全。<br/>
+  想要更轻量的同类客户端，请看同一作者的 <a href="https://github.com/Aerunox/Pawchive">Pawchive</a>（约 15 MB，以极致轻量简洁为核心）。
 </p>
 
 <p align="center">
@@ -16,6 +18,8 @@
   <img src="https://img.shields.io/badge/API-30%2B-34A853?style=for-the-badge&logo=android&logoColor=white" alt="Min API" />
   <img src="https://img.shields.io/badge/Target_API-36-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Target API" />
   <a href="https://t.me/Pawchive_Archive"><img src="https://img.shields.io/badge/Telegram-%E9%A2%91%E9%81%93-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram 频道" /></a>
+  <a href="https://github.com/Aerunox/Pawchive"><img src="https://img.shields.io/badge/%E8%BD%BB%E9%87%8F%E7%89%88-Pawchive-6366F1?style=for-the-badge" alt="轻量版 Pawchive" /></a>
+  <img src="https://img.shields.io/badge/%E5%8A%9F%E8%83%BD%E5%8F%96%E5%90%91-%E4%B8%B0%E5%AF%8C%E5%AE%8C%E6%95%B4-0EA5E9?style=for-the-badge" alt="功能取向" />
 </p>
 
 > [!IMPORTANT]
@@ -29,6 +33,55 @@
 > 代码均属本项目自有，不代表官方立场。应用内展示的所有内容、账号与数据均经由 Pawchive 公开接口读取，本项目不参与
 > 内容生产与审核，也不内置、不转存任何内容。站点服务条款、内容治理与账号事务一律以 [pawchive.pw](https://pawchive.pw)
 > 官方说明为准；本仓库只负责客户端自身的缺陷与改进建议。
+
+---
+
+## 设计取向：Archive vs Pawchive
+
+> [!TIP]
+> 本仓库与 [Pawchive](https://github.com/Aerunox/Pawchive) 出自同一作者，定位截然不同：
+> **Archive 以「功能丰富」为核心**——AI 翻译、端上 OCR、12 语言、Monet 动态取色，能想到的都做进去；
+> **Pawchive 以「极致轻量简洁」为核心**——约 15 MB、XML + ViewBinding、功能克制、够用就好。
+> 两者共用同一套 `core` / `data` 基座（本仓库直接复用了这两个模块，只重写了 `app` 层）。
+
+| 维度 | Archive（本项目） | Pawchive |
+|------|------------------|----------|
+| **设计取向** | 功能丰富、体验完整 | 极致轻量简洁 |
+| **核心信条** | 把能想到的都做进去 | 克制，够用就好 |
+| **UI 框架** | Jetpack Compose + Miuix（HyperOS 风格） | XML + ViewBinding，Material 3 |
+| **模块划分** | 3 个模块（`app` / `core` / `data`） | 10 个模块（`app` + 7 个 `feature-*` + `core` / `data`） |
+| **代码规模** | 188 个 Kotlin 文件，约 3.5 万行 | 150 个 Kotlin 文件，约 2.7 万行 |
+| **依赖数量** | 47 个依赖条目 | 37 个依赖条目 |
+| **安装包体积** | 35–43 MB（按 ABI 拆分）/ 97 MB（universal） | 约 15 MB（universal 单包） |
+| **AI 能力** | ✅ 多供应商（OpenAI / Anthropic / Gemini）、多模型档案、结构保真翻译 | ❌ |
+| **OCR** | ✅ PP-OCRv4（PaddleOCR + ONNX Runtime，端上运行） | ❌ |
+| **多语言** | 12 种（含阿拉伯语整页 RTL） | 3 种（简体中文 / English / 日本語） |
+| **外观定制** | 6 态配色（System / Light / Dark / Monet）+ 动态取色 + 种子色 | 6 种配色（默认 + 5 套强调色） |
+| **应用内更新** | ✅ 读取 GitHub Release | ❌（1.9.0 起已移除） |
+| **项目状态** | 持续开发 | 1.9.0 为最终版（EOL） |
+| **开源协议** | GPL-3.0 | MIT |
+| **同源关系** | 复用 Pawchive 的 `core` / `data`，重写 `app` 层 | 原始出处 |
+| **构建工具链** | AGP 9.4.1 · Gradle 9.8.0 · JDK 21 | AGP 9.3.2 · Gradle 9.5.1 · JDK 17 |
+| **自动化测试** | 19 个单元测试类 | 27 个单元测试类 + 1 个仪器化套件 |
+
+表中数字均取自两个仓库的实际配置文件与发布产物（Archive 1.0.2 / Pawchive 1.9.0），非估计值。
+
+**怎么选？**
+
+- 需要 AI 翻译、端上 OCR、多语言、高度自定义外观 → **留在本仓库（Archive）**
+- 只想要一个够快、够小、够稳定的客户端 → 用 [Pawchive 1.9.0](https://github.com/Aerunox/Pawchive/releases)
+- 想基于共同基座二次开发 → 两边的 `core` / `data` 同源，但请先看清协议差异（本仓库 GPL-3.0 有传染性，Pawchive 为 MIT）
+
+---
+
+## 相关项目
+
+| 项目 | 定位 | 协议 | 状态 |
+|------|------|------|------|
+| **Archive**（本仓库） | 功能丰富的完整客户端，Compose + Miuix | GPL-3.0 | 持续开发 |
+| [Pawchive](https://github.com/Aerunox/Pawchive) | 极致轻量的简洁客户端，约 15 MB | MIT | 1.9.0 最终版（EOL） |
+| 📢 [Telegram 频道](https://t.me/Pawchive_Archive) | 两个项目共用的发布与公告渠道 | — | — |
+| 🌐 [Pawchive 平台](https://pawchive.pw) | 内容来源站点（本客户端读取其公开接口） | — | — |
 
 ---
 
@@ -320,7 +373,7 @@ release 包为调试签名，可直接安装、同签名覆盖升级。
 
 本项目以 [GNU GPL-3.0](LICENSE)（GNU 通用公共许可证第 3 版）发布。**传染性 Copyleft**：任何基于本项目的修改版或衍生作品（包括修改后重新分发的 APK），都必须以 GPL-3.0 公开完整对应源码，不得闭源。
 
-`core/` 与 `data/` 模块源自 [Pawchive](https://github.com/Aerunox/Pawchive)（MIT License，同一作者，已随本项目转为 GPL-3.0）。第三方依赖各自遵循其原始许可（Apache-2.0 / MIT / BSD 等，均与 GPL-3.0 兼容）。
+`core/` 与 `data/` 模块源自 [Pawchive](https://github.com/Aerunox/Pawchive)（MIT License，同一作者，已随本项目转为 GPL-3.0）。若你需要一份**无传染性**的同源基座，请以 Pawchive 仓库的 MIT 版本为基线。第三方依赖各自遵循其原始许可（Apache-2.0 / MIT / BSD 等，均与 GPL-3.0 兼容）。
 
 本项目为独立的第三方非官方客户端，未取得 Pawchive 官方的授权、赞助或背书；Pawchive 名称与相关标识归其各自权利人所有。
 
