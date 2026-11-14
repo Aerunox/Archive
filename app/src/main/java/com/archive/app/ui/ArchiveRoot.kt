@@ -16,6 +16,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -254,6 +255,21 @@ fun ArchiveRoot(appViewModel: AppViewModel = hiltViewModel()) {
         seedColor = settings.seedColor.takeIf { it != 0L },
         blurThumbnails = settings.blurThumbnails,
     ) {
+        // 窗口底色跟随当前主题。Compose 只画到 View 这一层，窗口背景仍然是
+        // themes.xml 里那份静态颜色：转场淡出、系统权限/输入法弹窗、冷启动第一帧
+        // 露出的都是它。values-night 只能覆盖「跟随系统」，覆盖不到
+        // 「系统浅色 + 应用内手选深色」，所以在运行期按实际主题同步一次。
+        val themeBackground = LocalPurrColors.current.background
+        val windowBackground = remember(themeBackground) {
+            android.graphics.drawable.ColorDrawable(themeBackground.toArgb())
+        }
+        // 用 DisposableEffect 而不是 SideEffect：只在底色真的变了时才重设一次，
+        // 否则每次重组都会往窗口上重设 drawable（本组件重组很频繁）。
+        androidx.compose.runtime.DisposableEffect(themeBackground) {
+            ActivityFinder().find(view.context)?.window?.setBackgroundDrawable(windowBackground)
+            onDispose { }
+        }
+
         // 帖子多选：状态放在根上，所有列表页共享（PostCard 自己读取，见 PostSelection.kt）
         val selection = com.archive.app.ui.components.rememberPostSelection()
         val selectionViewModel: com.archive.app.ui.components.PostSelectionViewModel = hiltViewModel()
@@ -311,7 +327,14 @@ fun ArchiveRoot(appViewModel: AppViewModel = hiltViewModel()) {
             },
         ) {
         CompositionLocalProviderCompat(settings) {
-            androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+            androidx.compose.foundation.layout.Box(
+                androidx.compose.ui.Modifier
+                    .fillMaxSize()
+                    // 根容器铺一层主题底色。页面转场是「滑入 + 淡入 / 淡出」的组合，
+                    // 淡出那 240ms 里两页都是半透明的，背后必须有不透明的东西接着，
+                    // 否则会一路透到 Activity 窗口的 windowBackground（深色模式下是白的）。
+                    .background(LocalPurrColors.current.background),
+            ) {
                 // 磁盘设置读到之前不渲染任何界面：此时 settings 全是默认值，
                 // 用默认值判断会闪一下年龄确认页（它只在**从未确认过**时该出现一次）。
                 val loaded by appViewModel.loaded.collectAsStateWithLifecycle()

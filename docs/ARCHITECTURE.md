@@ -5,7 +5,7 @@
 
 ## 1. 项目身份
 
-- Android 客户端（applicationId `com.archive.app`，versionName 1.0.2 / versionCode 3，minSdk 30 / targetSdk 36 / compileSdk 37）【已确认：app/build.gradle.kts】
+- Android 客户端（applicationId `com.archive.app`，versionName 1.0.3 / versionCode 4，minSdk 30 / targetSdk 36 / compileSdk 37）【已确认：app/build.gradle.kts】
 - 三个 Gradle 模块：`:app`（UI，包 `com.archive.app`）→ 依赖 `:data`（包 `com.pawchive.data`）→ 依赖 `:core`（包 `com.pawchive.core`）；无 `:feature` 模块【已确认：模块路径与 import】
 - 基于上游 Pawchive 改造：core/data 沿用上游包名与多数基础设施，app 层为全新 Compose 重写（源码注释多处「照 Pawchive」「抄自 Pawchive Application」）【已确认：代码注释】
 - 仓库目录下无 `.git`（不是 git 工作树）【已确认：git log/status 报错】
@@ -43,7 +43,7 @@
 | 领域 | 文件 | 要点 |
 |---|---|---|
 | 入口/DI | `ArchiveApp.kt`、`MainActivity.kt`、`di/AppModule.kt` | 启动：WorkManager 初始化、CrashHandler、CloudflareManager.init、屏蔽快照预热、ClearanceCoordinator.preheat、缓存清理/内容同步/收藏队列/自动备份调度；语言在 attachBaseContext 落地；AppModule 只提供 AppDatabase（v1，**fallbackToDestructiveMigration(false)**，改 schema 不加迁移=打开即崩）【已确认】 |
-| 根组合 | `ui/ArchiveRoot.kt`、`ui/navigation/AppNavHost.kt` | AgeGate 在最外层；主题切换只重组不重建 Activity；多选/屏蔽操作条全局；导航 15 条路由（main/settings/search/downloads/notifications/blocked/translation/about/storage/history/login/creator/post/viewer），全屏菜单含全站搜索/历史/下载【已确认】 |
+| 根组合 | `ui/ArchiveRoot.kt`、`ui/navigation/AppNavHost.kt` | AgeGate 在最外层；主题切换只重组不重建 Activity；**根 Box 铺 `LocalPurrColors.current.background`、并把同一颜色同步到 `Activity.window` 背景**（转场淡出/系统弹窗/冷启动第一帧露的都是窗口底，深色模式曾因此闪白）；多选/屏蔽操作条全局；导航 15 条路由（main/settings/search/downloads/notifications/blocked/translation/about/storage/history/login/creator/post/viewer），全屏菜单含全站搜索/历史/下载【已确认】 |
 | 站点 API/数据 | `data/remote/PawchiveApi.kt`、`data/repo/PostRepository.kt`、`PostPagingSource.kt`、`CreatorRepository.kt`、`Mappers.kt`、`domain/Models.kt` | Offset 分页（PAGE_SIZE 50，短页即结尾）；**PagingConfig：initialLoadSize=一页、prefetchDistance=8、无占位**（对齐推特/JHenTai 的适量加载，2026-11-10）；**列表封面一律缩略图**（PostCard 默认 preferOriginal=false，原图仅查看器）；创作者库约 9.6 万行全量入 Room（15MB JSON），本地搜索/排序/分页；PostDetail 含 deferred 附件（tempUrl HLS 等，约 30 天过期）【已确认】 |
 | 本地数据 | `data/local/AppDatabase.kt`、`repo/LocalStore.kt` | Room v1：creators / favorite_posts / history（三张表，无迁移）【已确认】 |
 | 收藏动作 | `data/repo/FavoriteActions.kt`、`FavoriteSeqRepository.kt` | 本地收藏 + 云端 + 收藏全文缓存（BookmarkManager）+ 收藏即订阅；云端收藏序号索引（faved_seq，仅登录后）【已确认】 |
@@ -52,7 +52,7 @@
 | 语言 | `data/AppLanguage.kt`、`LanguageMirror.kt` | 10 种语言 + 跟随系统；DataStore 异步 → SharedPreferences 同步镜像供 attachBaseContext【已确认】 |
 | 设置页数据 | `data/SettingsRepository.kt` | `archive_settings`：色模式/Monet 风格/种子色/baseUrl/session cookie/模糊缩略图/防截屏/年龄确认【已确认】 |
 | OCR | `ocr/OcrEngine.kt`、`OcrService.kt`、assets（PaddleOCR ONNX） | 纯 Kotlin PP-OCRv4（DB 检测 + CRNN/CTC 识别），ONNX Runtime，可在 JVM 单测跑真实推理【已确认】 |
-| 主题/组件 | `ui/theme/ArchiveTheme.kt`（MiuixTheme 单一主题 + Monet）、`ui/components/`、`ui/design/` | AppColorMode（6 态）、AppMonetStyle、种子色、模糊缩略图；Lucide 图标【已确认】 |
+| 主题/组件 | `ui/theme/ArchiveTheme.kt`（MiuixTheme 单一主题 + Monet）、`ui/components/`、`ui/design/`、`res/values/themes.xml` + `res/values-night/themes.xml` | AppColorMode（6 态）、AppMonetStyle、种子色、模糊缩略图；`windowBackground` 夜间色 `#FF101216` 与 `purrDarkColors().background` 对齐（系统深色时冷启动不闪白），应用内手选深色由运行期 `setBackgroundDrawable` 接管；Lucide 图标【已确认】 |
 | 工具 | `util/`：HtmlParser、PostSort、SearchRelevance、BlurTransformation、ShareFiles、ExternalLinks、Fmt | 排序/相关度在 UI 层实现【已确认】 |
 
 ## 3. 关键调用链（修改前必读）
@@ -72,7 +72,7 @@
 | Room schema（app） | AppDatabase v1 + `fallbackToDestructiveMigration(false)`：改 schema 无迁移 → 打开崩溃 | AppModule.kt |
 | 下载并发/重试 | 并发上限 5、重试 1–3（SettingsManager 钳制），服务器合规要求 + UA 可识别 | DownloadCenter/HttpDownloadManager 注释 |
 | Cloudflare | 凭据 TTL 25min、UA 绑定、session= 剥离；改 UA 会导致 cf_clearance 失效 | CloudflareManager |
-| 收藏缓存 | GET 收藏列表 5 分钟内存缓存；写后必须 `invalidateByPathPrefix("/api/v1/account/favorites")` | AuthRepository |
+| 收藏缓存 | GET 收藏列表 5 分钟内存缓存；写后必须 `invalidateByPathPrefix("/api/v1/account/favorites")`；收藏页 reset 是整页替换，去重只能对本页做，绝不能拿状态里的旧 items 当前缀（否则同页全被判重 → fresh 空 → 误落「还没有收藏的帖子」空态） | AuthRepository/FavoritesViewModel |
 | 会话 | EncryptedSharedPreferences；登录宽限期 60s 内 401 不判失效；公开接口 401 映射为 Server(401) | SessionManager/AuthRepository |
 | AI 契约 | 翻译解析依赖哨兵分段（`<<<TITLE`/`<<<HTML`）；默认提示词含占位说明（小模型会照抄）；advancedParams 全关时必须下发空对象 | TranslationClient/AiRequestParams |
 | 备份 | schemaVersion=1；加字段向后兼容，改版本号则旧备份拒绝导入 | BackupManager |
@@ -84,5 +84,7 @@
 
 ## 5. 遗留/未知项
 
+- `tools_remove_lg.py`：一次性脚本（移除 LiquidGlass 主题），对当前构建无影响
 - `docs/api/pawchive_openapi.json`：站点 API 契约快照（与 PawchiveApi.kt 对照）
 - 未逐行阅读：绝大多数 Screen 的完整实现、ui/components、ui/design、部分 util（HtmlParser/PostSort 等）、core/util 若干工具——涉及具体页面修改时需再读对应文件
+- AppMemoryCache（core/store，与 api/ApiMemoryCache 不同的一个类）职责未核实

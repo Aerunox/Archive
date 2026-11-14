@@ -184,8 +184,17 @@ class FavoritesViewModel @Inject constructor(
                 if (gen != requestGen) return@onSuccess
                 val existing = posts.value.items
                 // 站点按 offset 分页时会返回重复条目（同一帖两条 faved_seq），
-                // 而 LazyColumn 的 key 重复会直接抛异常 —— 这里按「服务/作者/帖」去重
-                val seen = existing.mapTo(HashSet(existing.size)) { it.identityKey() }
+                // 而 LazyColumn 的 key 重复会直接抛异常 —— 这里按「服务/作者/帖」去重。
+                // reset（首屏加载 / 下拉刷新）是**整页替换**：只对本页去重，
+                // 绝不能拿状态里残留的旧列表当前缀过滤 —— reset 不清 items（为了刷新时
+                // 内容保持可见），若还拿旧 items 参与去重，服务端返回同一页时每条都会被
+                // 判成「已存在」，列表被刷成空 → 界面显示「账号「xxx」还没有收藏的帖子」，
+                // 必须再手动下拉一次（此时 items 已空、去重不再过滤）才恢复。
+                val seen = if (reset) {
+                    HashSet<String>(page.size)
+                } else {
+                    existing.mapTo(HashSet(existing.size)) { it.identityKey() }
+                }
                 val fresh = page.filter { seen.add(it.identityKey()) }
                 posts.value = posts.value.copy(
                     items = if (reset) fresh else existing + fresh,
@@ -330,10 +339,9 @@ fun FavoritesScreen(
     val creatorsScrollToTop = rememberListScrollToTopState(creatorsListState, onReachTop = { bottomBarState?.show() })
     AppScaffold(
         topBar = {
-            // 排序入口放在标题行右侧：与「收藏」同行，省掉一整行竖向空间。
-            // 只影响展示顺序（云端「加载更多」拿到的仍是接口顺序）；
-            // 多选期间收起：它就在顶栏操作位上，留着纯是误触源（退出多选自动回来）。
             AppTopBar(title = "收藏") {
+                // 排序入口收进标题行右侧：只影响展示顺序（云端「加载更多」拿到的仍是接口顺序）；
+                // 未登录没有可排序的内容，多选期间让位（退出多选自动恢复）
                 if (loggedIn && !selectionScoped) {
                     if (tab == 0) {
                         PostSortMenu(
@@ -342,7 +350,6 @@ fun FavoritesScreen(
                             // 收藏页没有搜索关键词，「相关度」没有意义，不列出来
                             hiddenModes = setOf(PostSortMode.RELEVANCE),
                             note = "排序作用于已加载的收藏；「收藏时间」用的是云端收藏序号",
-                            modifier = Modifier.padding(end = 12.dp),
                         )
                     } else {
                         CreatorSortMenu(
@@ -351,7 +358,6 @@ fun FavoritesScreen(
                             // 收藏作者列表没有搜索关键词，「相关度」在这里无从计算
                             hiddenModes = setOf(CreatorSortMode.RELEVANCE),
                             note = "排序作用于已加载的收藏作者",
-                            modifier = Modifier.padding(end = 12.dp),
                         )
                     }
                 }
