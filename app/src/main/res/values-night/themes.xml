@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        系统深色模式下的窗口底色。窗口背景由系统在 Compose 首帧之前就画出来
+        （冷启动、Activity 转场），values/ 里那份是白的，深色模式下必然闪白。
+        这里跟 PurrColors 的 purrDarkColors().background = #FF101216 对齐，
+        这样系统深色 + 应用深色时，从窗口到界面是同一种黑，看不出接缝。
+
+        注意：应用内手选的「深色」而系统是浅色时，本文件不生效 ——
+        那条路径由 ArchiveRoot 里的 setBackgroundDrawable 在运行期接管。
+    -->
+    <style name="Theme.Archive" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF101216</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

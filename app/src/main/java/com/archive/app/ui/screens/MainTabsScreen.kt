@@ -85,8 +85,8 @@ fun MainTabsScreen(navController: NavHostController) {
                     // 与 ViewPager2 的 offscreenPageLimit = 1 对齐：相邻页保持组合，切换即时
                     beyondViewportPageCount = 1,
                     key = { labels[it] },
-                    // 首尾页（首页 / 我）越过边界时彻底不动：默认的 overscroll 拉伸
-                    // 会让页面跟着手指晃一下，看起来像还能再滑出一页
+                    // 首尾页（首页 / 我）越界时不再跟着手指拉伸：关掉 Android 12+
+                    // 默认的 overscroll 拉伸效果，四页手感一致，也不会误以为还能滑到下一页
                     overscrollEffect = null,
                 ) { page ->
                     // 页面是否处于前台：页面内据此实现「每次进入自动刷新」
