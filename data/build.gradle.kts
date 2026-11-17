@@ -49,7 +49,7 @@ dependencies {
     api("androidx.datastore:datastore-preferences:1.2.1")
 
     // Gson - BookmarkManager/DownloadHistoryManager legacy 数据迁移
-    api("com.google.code.gson:gson:2.10.1")
+    api("com.google.code.gson:gson:2.15.0")
 
     // SAF DocumentFile - CacheRepository / DownloadRepository 目录操作
     implementation("androidx.documentfile:documentfile:1.0.1")

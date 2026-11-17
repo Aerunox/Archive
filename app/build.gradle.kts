@@ -147,7 +147,7 @@ dependencies {
     // Pawchive 功能拓展模块（下载中心/订阅通知/多账号/离线归档/Cloudflare 通关）
     implementation(project(":core"))
     implementation(project(":data"))
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.code.gson:gson:2.15.0")
     implementation("androidx.documentfile:documentfile:1.0.1")
 
     implementation(libs.retrofit)
