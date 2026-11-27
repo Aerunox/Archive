@@ -343,6 +343,18 @@ private fun buildSettingsGroups(
     // ── 网络 ──
     add(
         SettingsCategory.NETWORK,
+        SettingItem("详情页加载原图") {
+            AppSwitchSetting(
+                title = "详情页加载原图",
+                summary = "默认关闭：详情页显示缩略图省流量，点开大图才下载原图；" +
+                    "开启后详情页图片直接加载原图（更清晰，流量消耗更大）",
+                checked = settings.loadOriginalInDetail,
+                onCheckedChange = { appViewModel.setLoadOriginalInDetail(it) },
+            )
+        },
+    )
+    add(
+        SettingsCategory.NETWORK,
         SettingItem("Base URL") {
             AppListItem(
                 title = "Base URL",

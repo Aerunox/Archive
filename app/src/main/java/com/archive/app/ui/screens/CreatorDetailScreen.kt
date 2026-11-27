@@ -39,6 +39,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -595,13 +598,21 @@ private fun PostsPane(
     // 回到顶部：与主页同一套组件与判定（滚过若干条目后右下角浮出，点击滚回顶部）。
     // 顺带在回到顶部时让底部导航栏重新出现——与主页的 onReachTop 行为一致。
     val listState = rememberLazyListState()
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     val bottomBarState = LocalBottomBarScrollState.current
     val scrollToTop = rememberListScrollToTopState(
         state = listState,
         onReachTop = { bottomBarState?.show() },
     )
+    // 网格视图的回到顶部状态：与列表各自独立，按当前视图取用
+    val gridScrollToTop = com.archive.app.ui.components.rememberGridScrollToTopState(
+        state = gridState,
+        onReachTop = { bottomBarState?.show() },
+    )
     // 多选模式：本页与多选无关的控件（搜索、排序、筛选标签）一律让位
     val selectionScoped = isPostSelectionActive()
+    // 视图切换：列表 / Kemono 式两列缩略图网格（快速筛作品）；按页记忆
+    var isGrid by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         val keyboard = LocalSoftwareKeyboardController.current
         AnimatedVisibility(visible = !selectionScoped) {
@@ -621,6 +632,14 @@ private fun PostsPane(
                     placeholder = "在此作者内搜索（≥3 字符）",
                     modifier = Modifier.weight(1f),
                 )
+                // 视图切换（列表 / 两列网格），与首页同一套图标约定
+                androidx.compose.material3.IconButton(onClick = { isGrid = !isGrid }) {
+                    androidx.compose.material3.Icon(
+                        imageVector = if (isGrid) LucideIcons.listView else LucideIcons.gridView,
+                        contentDescription = if (isGrid) "切换为列表视图" else "切换为网格视图",
+                        tint = com.archive.app.ui.theme.LocalPurrColors.current.textSecondary,
+                    )
+                }
                 // 排序：只作用于已加载的帖子（站点接口没有排序参数）
                 PostSortMenu(
                     current = sortMode,
@@ -653,38 +672,83 @@ private fun PostsPane(
         }
         // 帖子流单独包一层 Box：回到顶部按钮浮在列表右下角（不占列表高度、不随内容滚动）
         Box(Modifier.weight(1f)) {
-            LazyColumn(
-                Modifier
-                    .fillMaxSize()
-                    .appListModifier(),
-                state = listState,
-                contentPadding = PaddingValues(bottom = bottomPadding + 12.dp),
-            ) {
-                if (items.loadState.refresh is LoadState.Loading && items.itemCount == 0) {
-                    item { AppLoading() }
-                } else if (items.loadState.refresh is LoadState.Error && items.itemCount == 0) {
-                    item { AppErrorState("帖子加载失败", onRetry = { items.retry() }) }
-                } else if (items.itemCount == 0 && items.loadState.refresh is LoadState.NotLoading) {
-                    item { AppEmptyState("该作者暂无帖子") }
-                }
-                items(count = items.itemCount, key = items.itemKey { it.postId }) { index ->
-                    // 触碰 Paging 的条目只为让它继续预取下一页；渲染顺序用排序后的列表
-                    items[index]
-                    val post = sortedPosts.getOrNull(index) ?: items[index] ?: return@items
-                    PostCard(
-                        post = post,
-                        showCreator = false,
-                    ) {
-                        navController.navigate(Routes.post(post.service, post.creatorId, post.postId))
+            if (isGrid) {
+                // Kemono 式网格：两列封面缩略图 + 标题，快速肉眼筛作品。
+                // 分页骨架与列表视图共用同一套 Paging 状态（含跨列的加载/错误/空占位）。
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .appListModifier(),
+                    state = gridState,
+                    contentPadding = PaddingValues(bottom = bottomPadding + 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (items.loadState.refresh is LoadState.Loading && items.itemCount == 0) {
+                        item(span = { GridItemSpan(2) }) { AppLoading() }
+                    } else if (items.loadState.refresh is LoadState.Error && items.itemCount == 0) {
+                        item(span = { GridItemSpan(2) }) {
+                            AppErrorState("帖子加载失败", onRetry = { items.retry() })
+                        }
+                    } else if (items.itemCount == 0 && items.loadState.refresh is LoadState.NotLoading) {
+                        item(span = { GridItemSpan(2) }) { AppEmptyState("该作者暂无帖子") }
+                    }
+                    items(
+                        count = items.itemCount,
+                        key = items.itemKey { it.postId },
+                        span = { GridItemSpan(1) },
+                    ) { index ->
+                        items[index]
+                        val post = sortedPosts.getOrNull(index) ?: items[index] ?: return@items
+                        PostCard(
+                            post = post,
+                            showCreator = false,
+                            compact = true,
+                            onClick = {
+                                navController.navigate(Routes.post(post.service, post.creatorId, post.postId))
+                            },
+                        )
+                    }
+                    when (items.loadState.append) {
+                        is LoadState.Loading -> item(span = { GridItemSpan(2) }) { AppLoadingItem() }
+                        else -> Unit
                     }
                 }
-                when (items.loadState.append) {
-                    is LoadState.Loading -> item { AppLoadingItem() }
-                    else -> Unit
+            } else {
+                LazyColumn(
+                    Modifier
+                        .fillMaxSize()
+                        .appListModifier(),
+                    state = listState,
+                    contentPadding = PaddingValues(bottom = bottomPadding + 12.dp),
+                ) {
+                    if (items.loadState.refresh is LoadState.Loading && items.itemCount == 0) {
+                        item { AppLoading() }
+                    } else if (items.loadState.refresh is LoadState.Error && items.itemCount == 0) {
+                        item { AppErrorState("帖子加载失败", onRetry = { items.retry() }) }
+                    } else if (items.itemCount == 0 && items.loadState.refresh is LoadState.NotLoading) {
+                        item { AppEmptyState("该作者暂无帖子") }
+                    }
+                    items(count = items.itemCount, key = items.itemKey { it.postId }) { index ->
+                        // 触碰 Paging 的条目只为让它继续预取下一页；渲染顺序用排序后的列表
+                        items[index]
+                        val post = sortedPosts.getOrNull(index) ?: items[index] ?: return@items
+                        PostCard(
+                            post = post,
+                            showCreator = false,
+                        ) {
+                            navController.navigate(Routes.post(post.service, post.creatorId, post.postId))
+                        }
+                    }
+                    when (items.loadState.append) {
+                        is LoadState.Loading -> item { AppLoadingItem() }
+                        else -> Unit
+                    }
                 }
             }
             ScrollToTopButton(
-                state = scrollToTop,
+                state = if (isGrid) gridScrollToTop else scrollToTop,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 16.dp, bottom = bottomPadding + 12.dp),

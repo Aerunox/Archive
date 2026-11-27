@@ -37,6 +37,8 @@ data class AppSettings(
     val baseUrl: String = UrlProvider.DEFAULT_BASE_URL,
     val sessionCookie: String = "",
     val blurThumbnails: Boolean = false,
+    /** 详情页直接加载原图；默认关（省流量），点进大图查看器仍会取原图。 */
+    val loadOriginalInDetail: Boolean = false,
     val flagSecure: Boolean = false,
     val ageConfirmed: Boolean = false,
 )
@@ -51,6 +53,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val BASE_URL = stringPreferencesKey("base_url")
         val SESSION_COOKIE = stringPreferencesKey("session_cookie")
         val BLUR_THUMBNAILS = booleanPreferencesKey("blur_thumbnails")
+        val LOAD_ORIGINAL_IN_DETAIL = booleanPreferencesKey("load_original_in_detail")
         val FLAG_SECURE = booleanPreferencesKey("flag_secure")
         val AGE_CONFIRMED = booleanPreferencesKey("age_confirmed")
     }
@@ -89,6 +92,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             baseUrl = (p[Keys.BASE_URL] ?: defaults.baseUrl).ifBlank { defaults.baseUrl },
             sessionCookie = p[Keys.SESSION_COOKIE] ?: "",
             blurThumbnails = p[Keys.BLUR_THUMBNAILS] ?: defaults.blurThumbnails,
+            loadOriginalInDetail = p[Keys.LOAD_ORIGINAL_IN_DETAIL] ?: defaults.loadOriginalInDetail,
             flagSecure = p[Keys.FLAG_SECURE] ?: defaults.flagSecure,
             ageConfirmed = p[Keys.AGE_CONFIRMED] ?: defaults.ageConfirmed,
         )
@@ -137,6 +141,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         sessionCookieSnapshot = trimmed
     }
     suspend fun setBlurThumbnails(value: Boolean) = edit { it[Keys.BLUR_THUMBNAILS] = value }
+    suspend fun setLoadOriginalInDetail(value: Boolean) = edit { it[Keys.LOAD_ORIGINAL_IN_DETAIL] = value }
     suspend fun setFlagSecure(value: Boolean) = edit { it[Keys.FLAG_SECURE] = value }
     suspend fun setAgeConfirmed(value: Boolean) = edit { it[Keys.AGE_CONFIRMED] = value }
 

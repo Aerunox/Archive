@@ -671,7 +671,11 @@ private fun DetailContent(
                     contentDescription = file.name ?: post.title,
                     blurredOverride = false,
                     cornerRadius = 16,
-                    originalUrl = UrlProvider.fileUrl(baseUrl, filePath),
+                    // 「详情页加载原图」开关（默认关）：开启时详情页直接取原图，
+                    // 关闭时只用缩略图，点进大图查看器仍会下载原图。
+                    originalUrl = if (settings.loadOriginalInDetail) {
+                        UrlProvider.fileUrl(baseUrl, filePath)
+                    } else null,
                 )
             }
         }
@@ -833,7 +837,9 @@ private fun DetailContent(
                                             contentDescription = attachment.name
                         ?: androidx.compose.ui.res.stringResource(com.archive.app.R.string.attachment_image),
                                             blurredOverride = false,
-                                            originalUrl = UrlProvider.fileUrl(baseUrl, imagePath),
+                                            originalUrl = if (settings.loadOriginalInDetail) {
+                                                UrlProvider.fileUrl(baseUrl, imagePath)
+                                            } else null,
                                         )
                                     }
                                 }

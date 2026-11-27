@@ -112,6 +112,7 @@ class AppViewModel @Inject constructor(
     fun setBaseUrl(value: String) = launch { settings.setBaseUrl(value) }
     fun setSessionCookie(value: String) = launch { settings.setSessionCookie(value) }
     fun setBlurThumbnails(value: Boolean) = launch { settings.setBlurThumbnails(value) }
+    fun setLoadOriginalInDetail(value: Boolean) = launch { settings.setLoadOriginalInDetail(value) }
     fun setFlagSecure(value: Boolean) = launch { settings.setFlagSecure(value) }
     fun setAgeConfirmed(value: Boolean) = launch { settings.setAgeConfirmed(value) }
 

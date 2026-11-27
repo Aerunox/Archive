@@ -8,16 +8,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -65,6 +68,7 @@ import com.archive.app.ui.design.AppScaffold
 import com.archive.app.ui.design.LocalBottomBarScrollState
 import com.archive.app.ui.design.hideBottomBarOnScroll
 import com.archive.app.ui.design.rememberAppBottomBarScrollState
+import com.archive.app.ui.design.AppSearchField
 import com.archive.app.ui.design.AppText
 import com.archive.app.ui.design.AppTextStyle
 import com.archive.app.ui.design.AppTopBar
@@ -326,6 +330,19 @@ fun FavoritesScreen(
     val creatorSortMode by viewModel.creatorSortMode.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
 
+    // 顶栏搜索：左上角放大镜进入搜索态，顶栏原位变成搜索栏过滤**已加载**的收藏作者；
+    // 点 ❌（或「取消」）清空关键词并退出搜索态，顶栏恢复原状。
+    var searchActive by rememberSaveable { mutableStateOf(false) }
+    var creatorQuery by rememberSaveable { mutableStateOf("") }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val filteredCreators = remember(creatorsState.items, creatorQuery) {
+        val q = creatorQuery.trim()
+        if (q.isEmpty()) creatorsState.items
+        else creatorsState.items.filter {
+            it.name.contains(q, ignoreCase = true) || it.id.contains(q, ignoreCase = true)
+        }
+    }
+
     // 每次进入自动刷新账号收藏
     EnterRefreshEffect { viewModel.refreshAll() }
 
@@ -339,26 +356,77 @@ fun FavoritesScreen(
     val creatorsScrollToTop = rememberListScrollToTopState(creatorsListState, onReachTop = { bottomBarState?.show() })
     AppScaffold(
         topBar = {
-            AppTopBar(title = "收藏") {
-                // 排序入口收进标题行右侧：只影响展示顺序（云端「加载更多」拿到的仍是接口顺序）；
-                // 未登录没有可排序的内容，多选期间让位（退出多选自动恢复）
-                if (loggedIn && !selectionScoped) {
-                    if (tab == 0) {
-                        PostSortMenu(
-                            current = sortMode,
-                            onSelect = viewModel::setSortMode,
-                            // 收藏页没有搜索关键词，「相关度」没有意义，不列出来
-                            hiddenModes = setOf(PostSortMode.RELEVANCE),
-                            note = "排序作用于已加载的收藏；「收藏时间」用的是云端收藏序号",
+            if (searchActive) {
+                // 搜索态：顶栏原位变成搜索栏（自带状态栏内边距，与正常顶栏同高对齐）
+                AppSearchField(
+                    query = creatorQuery,
+                    onQueryChange = { creatorQuery = it },
+                    onSearch = { keyboard?.hide() },
+                    placeholder = "搜索已收藏的作者（名称 / ID）",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 6.dp, vertical = 6.dp),
+                    trailing = {
+                        // ❌：清空关键词并退出搜索态，顶栏恢复原状
+                        AppIconButton(
+                            onClick = {
+                                creatorQuery = ""
+                                searchActive = false
+                                keyboard?.hide()
+                            },
+                            icon = LucideIcons.close,
+                            contentDescription = "退出搜索",
                         )
-                    } else {
-                        CreatorSortMenu(
-                            current = creatorSortMode,
-                            onSelect = viewModel::setCreatorSort,
-                            // 收藏作者列表没有搜索关键词，「相关度」在这里无从计算
-                            hiddenModes = setOf(CreatorSortMode.RELEVANCE),
-                            note = "排序作用于已加载的收藏作者",
+                    },
+                )
+            } else {
+                // 自定义顶栏：Box 叠加布局 —— 标题以**整条顶栏宽度**为基准绝对居中，
+                // 搜索按钮悬浮左上、排序菜单悬浮右侧；两侧控件宽度不对称时标题也不偏移。
+                // 状态栏内边距自己补，高度与 AppTopBar 对齐。
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                ) {
+                    // 居中标题（第二层：不受两侧控件宽度影响）
+                    AppText(
+                        "收藏",
+                        style = AppTextStyle.TITLE,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                    // 左上角搜索入口（未登录无可搜内容、多选期间让位，退出多选自动恢复）
+                    if (loggedIn && !selectionScoped) {
+                        AppIconButton(
+                            onClick = { searchActive = true },
+                            icon = LucideIcons.search,
+                            contentDescription = "搜索收藏作者",
+                            modifier = Modifier.align(Alignment.CenterStart),
                         )
+                    }
+                    // 排序入口收进标题行右侧：只影响展示顺序（云端「加载更多」拿到的仍是接口顺序）；
+                    // 未登录没有可排序的内容，多选期间让位（退出多选自动恢复）
+                    if (loggedIn && !selectionScoped) {
+                        Box(Modifier.align(Alignment.CenterEnd)) {
+                            if (tab == 0) {
+                                PostSortMenu(
+                                    current = sortMode,
+                                    onSelect = viewModel::setSortMode,
+                                    // 收藏页没有搜索关键词，「相关度」没有意义，不列出来
+                                    hiddenModes = setOf(PostSortMode.RELEVANCE),
+                                    note = "排序作用于已加载的收藏；「收藏时间」用的是云端收藏序号",
+                                )
+                            } else {
+                                CreatorSortMenu(
+                                    current = creatorSortMode,
+                                    onSelect = viewModel::setCreatorSort,
+                                    // 收藏作者列表没有搜索关键词，「相关度」在这里无从计算
+                                    hiddenModes = setOf(CreatorSortMode.RELEVANCE),
+                                    note = "排序作用于已加载的收藏作者",
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -419,7 +487,8 @@ fun FavoritesScreen(
                     bottomBarState = bottomBarState,
                     listState = creatorsListState,
                     scrollToTop = creatorsScrollToTop,
-                    state = creatorsState,
+                    state = creatorsState.copy(items = filteredCreators),
+                    searchQuery = creatorQuery.takeIf { it.isNotBlank() },
                     baseUrl = baseUrl,
                     bottomPadding = padding.calculateBottomPadding(),
                     onOpen = { creator ->
@@ -536,6 +605,7 @@ private fun CreatorsTab(
     listState: LazyListState,
     scrollToTop: ScrollToTopState,
     state: FavoritesViewModel.ListState<FavoriteCreator>,
+    searchQuery: String? = null,
     baseUrl: String,
     bottomPadding: androidx.compose.ui.unit.Dp,
     onOpen: (FavoriteCreator) -> Unit,
@@ -552,7 +622,11 @@ private fun CreatorsTab(
             )
         }
         state.items.isEmpty() -> PullableState {
-            AppEmptyState("还没有收藏的作者")
+            // 搜索过滤到 0 条与「真的没有收藏」区分开：给可行动的提示
+            AppEmptyState(
+                if (searchQuery != null) "没有匹配「$searchQuery」的收藏作者"
+                else "还没有收藏的作者",
+            )
         }
         else -> LazyColumn(
             bottomBarState.attach(Modifier.fillMaxSize().appListModifier()),
